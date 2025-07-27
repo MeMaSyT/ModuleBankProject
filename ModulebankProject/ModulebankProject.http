@@ -1,0 +1,6 @@
+@ModulebankProject_HostAddress = http://localhost:5031
+
+GET {{ModulebankProject_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
