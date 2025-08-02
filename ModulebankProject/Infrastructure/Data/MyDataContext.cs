@@ -5,7 +5,7 @@ namespace ModulebankProject.Infrastructure.Data
 {
     public class MyDataContext : IMyDataContext
     {
-        public List<Account> Accounts { get; set; } = new List<Account>();
-        public List<Transaction> Transactions { get; set; } = new List<Transaction>();
+        public List<Account> Accounts { get; set; } = [];
+        public List<Transaction> Transactions { get; set; } = [];
     }
 }

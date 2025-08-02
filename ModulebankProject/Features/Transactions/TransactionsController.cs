@@ -1,59 +1,73 @@
 ﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ModulebankProject.Features.Transactions.GetTransaction;
 using ModulebankProject.Features.Transactions.RegisterTransaction;
 using ModulebankProject.Features.Transactions.TransferTransaction;
-using ModulebankProject.Infrastructure;
 
 namespace ModulebankProject.Features.Transactions
 {
+    /// <summary>
+    /// Контроллер транзакций
+    /// </summary>
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class TransactionsController : Controller
     {
         private readonly IMediator _mediator;
 
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
         public TransactionsController(IMediator mediator)
         {
             _mediator = mediator;
         }
 
+        /// <summary>
+        /// Регистрация транзакции
+        /// </summary>
+        /// <param name="ownerId">Владелец транзакции</param>
+        /// <param name="command"></param>
+        /// <returns></returns>
         [HttpPost("{ownerId}/")]
         public async Task<ActionResult> RegisterTransaction(Guid ownerId, [FromBody] RegisterTransactionCommand command)
         {
-            if (!AuthentificationService.IsAuthentificated(ownerId)) return Forbid();
-
-            TransactionDto transaction = await _mediator.Send(command);
-            return CreatedAtRoute("GetTransaction", new { id = transaction.Id }, transaction);
+            var result = await _mediator.Send(command);
+            return result.Decide(
+                success: x => CreatedAtRoute("GetTransaction", new { ownerId, id = x!.Id }, x),
+                failure: e => StatusCode(e!.StatusCode, new { Success = false, Error = e.GetResponse() }));
         }
         
+        /// <summary>
+        /// Проведение транзакции
+        /// </summary>
+        /// <param name="ownerId">Владелец транзакции</param>
+        /// <param name="id">Номер транзакции</param>
+        /// <returns></returns>
         [HttpPatch("{ownerId}/{id}")]
         public async Task<ActionResult> TransferTransaction(Guid ownerId, Guid id)
         {
-            if (!AuthentificationService.IsAuthentificated(ownerId)) return Forbid();
-
             var result = await _mediator.Send(new TransferTransactionCommand(id));
-            if (result.Status == TransactionStatus.Error)
-            {
-                if (result.Description is 
-                    "Transaction Not Found" or 
-                    "Account Not Found" or 
-                    "CounterpartyAccount Not Found") return NotFound(result.Description);
-                
-                if (result.Description == "Insufficient Funds") return Forbid(result.Description);
-            }
-            return Ok("Transaction Complete");
+
+            return result.Decide(
+                success: x => Ok(x),
+                failure: e => StatusCode(e!.StatusCode, new { Success = false, Error = e.GetResponse()}));
         }
 
+        /// <summary>
+        /// Получить транзакцию
+        /// </summary>
+        /// <param name="ownerId">Владелец транзакции</param>
+        /// <param name="id">Номер транзакции</param>
+        /// <returns></returns>
         [HttpGet("{ownerId}/{id}", Name = "GetTransaction")]
         public async Task<ActionResult<Transaction>> GetTransaction(Guid ownerId, Guid id)
         {
-            if (!AuthentificationService.IsAuthentificated(ownerId)) return Forbid();
-
-            TransactionDto? transaction = await _mediator.Send(new GetTransactionRequest(id));
-            if (transaction == null) return NotFound("Transaction Not Found");
-
-            return Ok(transaction);
+            var result = await _mediator.Send(new GetTransactionRequest(id));
+            return result.Decide(
+                // ReSharper disable once ConvertClosureToMethodGroup с лямбда удобнее
+                success: x => Ok(x),
+                failure: e => StatusCode(e!.StatusCode, new { Success = false, Error = e.GetResponse() }));
         }
     }
 }

@@ -9,6 +9,7 @@ namespace ModulebankProject.PipelineBehaviors
     {
         private readonly IEnumerable<IValidator<TRequest>> _validators;
 
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
         public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
         {
             _validators = validators;
@@ -17,15 +18,15 @@ namespace ModulebankProject.PipelineBehaviors
         public Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
         {
             var context = new ValidationContext<TRequest>(request);
-            var failures = _validators
+            var failure = _validators
                 .Select(x => x.Validate(context))
                 .SelectMany(x => x.Errors)
                 .Where(x => x != null)
-                .ToList();
+                .Take(1).ToList();
 
-            if (failures.Any())
+            if (failure.Any())
             {
-                throw new ValidationException(failures);
+                throw new ValidationException(failure);
             }
 
             return next(cancellationToken);
