@@ -1,6 +1,11 @@
 ﻿using MediatR;
+using ModulebankProject.MbResult;
 
 namespace ModulebankProject.Features.Accounts.CheckAccountAvailability
 {
-    public record CheckAccountAvailabilityRequest(Guid Id) : IRequest<bool>;
+    /// <summary>
+    /// Request для проверки существования счёта
+    /// </summary>
+    /// <param name="Id">Номер счёта</param>
+    public record CheckAccountAvailabilityRequest(Guid Id) : IRequest<MbResult<bool, ApiError>>;
 }

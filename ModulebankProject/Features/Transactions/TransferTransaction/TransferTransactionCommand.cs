@@ -1,6 +1,11 @@
 ﻿using MediatR;
+using ModulebankProject.MbResult;
 
 namespace ModulebankProject.Features.Transactions.TransferTransaction
 {
-    public record TransferTransactionCommand(Guid Id) : IRequest<TransferTransactionDto>;
+    /// <summary>
+    /// Command для проведения транзакции
+    /// </summary>
+    /// <param name="Id">Номер транзакции</param>
+    public record TransferTransactionCommand(Guid Id) : IRequest<MbResult<TransactionStatus, ApiError>>;
 }

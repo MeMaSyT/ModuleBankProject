@@ -11,6 +11,7 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         private readonly IMyDataContext _myDataContext;
         private readonly IMapper _mapper;
 
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
         public AccountsRepository(IMyDataContext myDataContext, IMapper mapper)
         {
             _myDataContext = myDataContext;
@@ -19,15 +20,16 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
 
         public async Task<Account> CreateAccount(CreateAccountCommand request)
         {
-            Account creatingAccount = Account.Create(
+            var creatingAccount = new Account(
                 Guid.NewGuid(),
                 request.OwnerId,
                 request.AccountType,
-                request.Сurrency,
+                request.Currency,
+                0M,
                 request.InterestRate,
                 DateTime.UtcNow,
                 request.CloseDate
-            ).Value;
+            );
 
             _myDataContext.Accounts.Add(creatingAccount);
             await Task.Delay(500); //DataBase delay emulation
@@ -37,13 +39,13 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
 
         public async Task<Account?> EditAccount(EditAccountCommand request)
         {
-            Account? editingAccount = _myDataContext.Accounts
+            var editingAccount = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == request.Id);
             if (editingAccount != null)
             {
-                editingAccount.SetCurrency(request.Сurrency ?? editingAccount.Currency);
-                editingAccount.SetInterestRate(request.InterestRate ?? editingAccount.InterestRate);
-                editingAccount.SetCloseDatee(request.CloseDate ?? editingAccount.CloseDate);
+                editingAccount.Currency = request.Currency ?? editingAccount.Currency;
+                editingAccount.InterestRate = request.InterestRate ?? editingAccount.InterestRate;
+                editingAccount.CloseDate = request.CloseDate ?? editingAccount.CloseDate;
             }
             await Task.Delay(500); //DataBase delay emulation
 
@@ -51,7 +53,7 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<Guid> DeleteAccount(Guid id)
         {
-            Account? deletingAccount = _myDataContext.Accounts
+            var deletingAccount = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == id);
             if (deletingAccount == null) return Guid.Empty;
 
@@ -70,7 +72,7 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<AccountStatementDto?> GetAccountStatement(Guid id, DateTime startRangeDate, DateTime endRangeDate)
         {
-            Account? account = _myDataContext.Accounts
+            var account = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == id);
             if (account == null) return null;
             await Task.Delay(500); //DataBase delay emulation
@@ -92,7 +94,7 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<Account?> GetAccountWithoutTransactions(Guid id)
         {
-            Account? account = _myDataContext.Accounts
+            var account = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == id);
             await Task.Delay(500); //DataBase delay emulation
 
@@ -100,7 +102,7 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<bool> CheckAccountAvailability(Guid id)
         {
-            Account? account = _myDataContext.Accounts
+            var account = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == id);
             await Task.Delay(500); //DataBase delay emulation
             if (account == null) return false;
@@ -109,12 +111,13 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<string> ApplyTransaction(Transaction transaction)
         {
-            Account? account = _myDataContext.Accounts
+            var account = _myDataContext.Accounts
                 .FirstOrDefault(x => x.Id == transaction.AccountId);
             if (account == null) return "AccountNotFoundWhileApplyTransaction";
 
-            bool staus = account.ChangeBalance(transaction.Amount * (int)transaction.TransactionType);
-            if (!staus) return "ErrorWhileApplyTransaction";
+            bool status = AccountHelper.TryChangeBalance(account.Balance, transaction.Amount * (int)transaction.TransactionType, out decimal result);
+            if (!status) return "ErrorWhileApplyTransaction";
+            account.Balance = result;
 
             await Task.Delay(500); //DataBase delay emulation
 

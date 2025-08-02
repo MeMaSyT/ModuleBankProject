@@ -8,15 +8,15 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
     {
         private readonly IMyDataContext _myDataContext;
 
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
         public TransactionsRepository(IMyDataContext myDataContext)
         {
             _myDataContext = myDataContext;
         }
 
-        public async Task<Transaction> RegisterTransaction(RegisterTransactionCommand request)
+        public async Task<Transaction?> RegisterTransaction(RegisterTransactionCommand request)
         {
-            Transaction registeringTransaction = Transaction
-                .Create(
+            Transaction registeringTransaction = new Transaction(
                     Guid.NewGuid(),
                     request.AccountId,
                     request.CounterpartyAccountId,
@@ -25,11 +25,11 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
                     request.TransactionType,
                     request.Description,
                     DateTime.UtcNow,
-                    TransactionStatus.Registered).Value;
+                    TransactionStatus.Registered);
             _myDataContext.Transactions.Add(registeringTransaction);
 
             Account? account = _myDataContext.Accounts.FirstOrDefault(a => a.Id == request.AccountId);
-            if (account == null) throw new Exception("Account of Transaction not found");
+            if (account == null) return null;
             account.Transactions.Add(registeringTransaction);
             await Task.Delay(500); //DataBase delay emulation
 

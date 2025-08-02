@@ -1,24 +1,12 @@
-﻿using CSharpFunctionalExtensions;
-
-namespace ModulebankProject.Features.Transactions
+﻿namespace ModulebankProject.Features.Transactions
 {
-    public enum TransactionType
-    {
-        Debit = 1,
-        Credit = -1
-    }
-
-    public enum TransactionStatus
-    {
-        Registered,
-        InProcess,
-        Completed,
-        Error
-    }
-
+    /// <summary>
+    /// Модель транзакции
+    /// </summary>
     public class Transaction
     {
-        private Transaction(
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
+        public Transaction(
             Guid id,
             Guid accountId,
             Guid? counterpartyAccountId,
@@ -40,43 +28,41 @@ namespace ModulebankProject.Features.Transactions
             TransactionStatus = transactionStatus;
         }
 
-        public Guid Id { get; }
-        public Guid AccountId { get; }
-        public Guid? CounterpartyAccountId { get; }
-        public decimal Amount { get; }
-        public string Currency { get; }
-        public TransactionType TransactionType { get; }
-        public string Description { get; }
-        public DateTime Time { get; }
-        public TransactionStatus TransactionStatus { get; private set; }
-
-        public static Result<Transaction> Create(
-            Guid id,
-            Guid accountId,
-            Guid? counterpartyAccountId,
-            decimal amount,
-            string currency,
-            TransactionType transactionType,
-            string description,
-            DateTime time,
-            TransactionStatus transactionStatus)
-        {
-            return Result.Success(
-                new Transaction(
-                    id, 
-                    accountId, 
-                    counterpartyAccountId, 
-                    amount, 
-                    currency, 
-                    transactionType, 
-                    description,
-                    time, 
-                    transactionStatus));
-        }
-
-        public void SetTransactionStatus(TransactionStatus newStatus)
-        {
-            TransactionStatus = newStatus;
-        }
+        /// <summary>
+        /// Номер транзакции
+        /// </summary>
+        public Guid Id { get; set; }
+        /// <summary>
+        /// Номер счёта
+        /// </summary>
+        public Guid AccountId { get; set; }
+        /// <summary>
+        /// Номер счёта контрагента
+        /// </summary>
+        public Guid? CounterpartyAccountId { get; set; }
+        /// <summary>
+        /// Сумма транзакции
+        /// </summary>
+        public decimal Amount { get; set; }
+        /// <summary>
+        /// Валюта
+        /// </summary>
+        public string Currency { get; set; }
+        /// <summary>
+        /// Тип транзакции
+        /// </summary>
+        public TransactionType TransactionType { get; set; }
+        /// <summary>
+        /// Описание
+        /// </summary>
+        public string Description { get; set; }
+        /// <summary>
+        /// Время транзакции
+        /// </summary>
+        public DateTime Time { get; set; }
+        /// <summary>
+        /// Статус транзакции
+        /// </summary>
+        public TransactionStatus TransactionStatus { get; set; }
     }
 }

@@ -2,10 +2,10 @@
 {
     public class CurrencyService
     {
-        public static readonly string[] Currencies = new string[]
-        {
+        public static readonly string[] Currencies =
+        [
             "RUB", "USD"
-        };
+        ];
 
         public static string GetCurrency(string? value)
         {
