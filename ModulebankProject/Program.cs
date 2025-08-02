@@ -55,7 +55,7 @@ namespace ModulebankProject
             //if (app.Environment.IsDevelopment())
             //{
                 app.UseSwagger();
-                app.UseSwaggerUI();
+                app.UseSwaggerUI(opt => opt.OAuthClientId("client"));
             //}
             app.UseMiddleware<ErrorHandlingMiddleware>();
             app.UseHttpsRedirection();
