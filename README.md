@@ -1,3 +1,5 @@
+При нажатии кнопки Authorize в Swagger введите client_id = client
+
 <h2>Описание структуры проекта</h2>
 <ul>
 <li>/Features</li>
