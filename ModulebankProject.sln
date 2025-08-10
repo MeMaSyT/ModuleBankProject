@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModulebankProject", "Module
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModulebankProject.Tests", "..\ModulebankProject.Tests\ModulebankProject.Tests.csproj", "{E3DDC2C6-7157-4C25-B82F-A3BB178E0BCD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModulebankProject.Tests", "ModulebankProject.Tests\ModulebankProject.Tests.csproj", "{27AAE089-5C53-531F-5E29-99B2389C0A10}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81DDED9D-158B-E303-5F62-77A2896D2A5A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E3DDC2C6-7157-4C25-B82F-A3BB178E0BCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E3DDC2C6-7157-4C25-B82F-A3BB178E0BCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E3DDC2C6-7157-4C25-B82F-A3BB178E0BCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E3DDC2C6-7157-4C25-B82F-A3BB178E0BCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27AAE089-5C53-531F-5E29-99B2389C0A10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27AAE089-5C53-531F-5E29-99B2389C0A10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27AAE089-5C53-531F-5E29-99B2389C0A10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27AAE089-5C53-531F-5E29-99B2389C0A10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
