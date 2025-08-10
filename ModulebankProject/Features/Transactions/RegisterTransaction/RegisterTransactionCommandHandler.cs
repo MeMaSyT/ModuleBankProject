@@ -20,8 +20,9 @@ namespace ModulebankProject.Features.Transactions.RegisterTransaction
         public async Task<MbResult<TransactionDto, ApiError>> Handle(RegisterTransactionCommand request, CancellationToken cancellationToken)
         {
             var transaction = await _transactionsRepository.RegisterTransaction(request);
-            if(transaction == null) return MbResult<TransactionDto, ApiError>.Failure(new ApiError("Account Not Found", StatusCodes.Status404NotFound));
-            return MbResult<TransactionDto, ApiError>.Success(_mapper.Map<TransactionDto>(transaction));
+            if(!transaction.IsSuccess) return MbResult<TransactionDto, ApiError>.Failure(transaction.Error!);
+
+            return MbResult<TransactionDto, ApiError>.Success(_mapper.Map<TransactionDto>(transaction.Result));
         }
     }
 }

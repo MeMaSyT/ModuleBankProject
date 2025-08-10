@@ -22,9 +22,9 @@ namespace ModulebankProject.Features.Accounts.EditAccount
             CancellationToken cancellationToken)
         {
             var editingAccount = await _accountsRepository.EditAccount(request);
-            if (editingAccount == null) return MbResult<AccountDto, ApiError>.Failure(new ApiError("Editing Account Not Found", StatusCodes.Status404NotFound));
+            if (!editingAccount.IsSuccess) return MbResult<AccountDto, ApiError>.Failure(editingAccount.Error!);
 
-            return MbResult<AccountDto, ApiError>.Success(_mapper.Map<AccountDto>(editingAccount));
+            return MbResult<AccountDto, ApiError>.Success(_mapper.Map<AccountDto>(editingAccount.Result));
         }
     }
 }

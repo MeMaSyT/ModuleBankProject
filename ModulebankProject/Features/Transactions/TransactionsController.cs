@@ -50,6 +50,7 @@ namespace ModulebankProject.Features.Transactions
             var result = await _mediator.Send(new TransferTransactionCommand(id));
 
             return result.Decide(
+                // ReSharper disable once ConvertClosureToMethodGroup решарпер портит читабельность
                 success: x => Ok(x),
                 failure: e => StatusCode(e!.StatusCode, new { Success = false, Error = e.GetResponse()}));
         }

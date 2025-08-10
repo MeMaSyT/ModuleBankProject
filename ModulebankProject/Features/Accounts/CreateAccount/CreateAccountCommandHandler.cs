@@ -19,7 +19,10 @@ namespace ModulebankProject.Features.Accounts.CreateAccount
         }
         public async Task<MbResult<AccountDto, ApiError>> Handle(CreateAccountCommand request, CancellationToken cancellationToken)
         {
-            var createDto = _mapper.Map<AccountDto>(await _accountsRepository.CreateAccount(request));
+            var createdAccount = await _accountsRepository.CreateAccount(request);
+            if(!createdAccount.IsSuccess) return MbResult<AccountDto, ApiError>.Failure(createdAccount.Error!);
+
+            var createDto = _mapper.Map<AccountDto>(createdAccount.Result);
             if(createDto == null) return MbResult<AccountDto, ApiError>.Failure(new ApiError("Mapping Error", StatusCodes.Status500InternalServerError));
             return MbResult<AccountDto, ApiError>.Success(createDto);
         }

@@ -6,7 +6,7 @@ using ModulebankProject.MbResult;
 namespace ModulebankProject.Features.Transactions.TransferTransaction
 {
     // ReSharper disable once UnusedMember.Global используется медиатором, решарпер слишком глуп, чтобы это понять
-    public class TransferTransactionCommandHandler : IRequestHandler<TransferTransactionCommand, MbResult<TransactionStatus, ApiError>>
+    public class TransferTransactionCommandHandler : IRequestHandler<TransferTransactionCommand, MbResult<string, ApiError>>
     {
         private readonly ITransactionsRepository _transactionsRepository;
         private readonly IAccountsRepository _accountsRepository;
@@ -19,54 +19,49 @@ namespace ModulebankProject.Features.Transactions.TransferTransaction
             _accountsRepository = accountsRepository;
         }
 
-        public async Task<MbResult<TransactionStatus, ApiError>> Handle(TransferTransactionCommand request,
+        public async Task<MbResult<string, ApiError>> Handle(TransferTransactionCommand request,
             CancellationToken cancellationToken)
         {
-            Transaction? debit, credit;
-            string debitResult = "", creditResult = "";
+            MbResult<string, ApiError> transactionResult;
 
             //Transaction check
             Transaction? transaction = await _transactionsRepository.GetTransaction(request.Id);
             if (transaction == null)
-                return MbResult<TransactionStatus, ApiError>.Failure(new ApiError("Transaction Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
+                return MbResult<string, ApiError>.Failure(new ApiError("Transaction Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
             if (transaction.TransactionStatus is
                 TransactionStatus.Completed or
-                TransactionStatus.InProcess or
-                TransactionStatus.Error)
-                return MbResult<TransactionStatus, ApiError>.Failure(new ApiError("TransactionIsNotAvailable", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
+                TransactionStatus.InProcess)
+                return MbResult<string, ApiError>.Failure(new ApiError("TransactionIsNotAvailable", StatusCodes.Status500InternalServerError, "TransactionStatus: " + transaction.TransactionStatus));
             if (!await _accountsRepository.CheckAccountAvailability(transaction.AccountId))
             {
-                transaction.TransactionStatus = TransactionStatus.Error;
-                return MbResult<TransactionStatus, ApiError>.Failure(new ApiError("Account Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
+                await _transactionsRepository.SetTransactionStatus(transaction.Id, TransactionStatus.Error);
+                return MbResult<string, ApiError>.Failure(new ApiError("Account Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
             }
 
             //CounterpartyTransaction check
             Transaction? counterpartyTransaction = null;
             if (transaction.CounterpartyAccountId != null)
             {
-                counterpartyTransaction = await _transactionsRepository.RegisterTransaction(
+                counterpartyTransaction = _transactionsRepository.RegisterTransaction(
                     new RegisterTransactionCommand(
                         (Guid)transaction.CounterpartyAccountId,
                         transaction.AccountId,
                         transaction.Amount,
                         transaction.Currency,
                         (TransactionType)(-(int)transaction.TransactionType),
-                        transaction.Description));
+                        transaction.Description)).Result.Result;
 
                 if (!await _accountsRepository.CheckAccountAvailability((Guid)transaction.CounterpartyAccountId))
                 {
-                    transaction.TransactionStatus = TransactionStatus.Error;
-                    return MbResult<TransactionStatus, ApiError>.Failure(new ApiError("CounterpartyAccount Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
+                    await _transactionsRepository.SetTransactionStatus(transaction.Id, TransactionStatus.Error);
+                    return MbResult<string, ApiError>.Failure(new ApiError("CounterpartyAccount Not Found", StatusCodes.Status404NotFound, "TransactionStatus: " + TransactionStatus.Error));
                 }
             }
 
             //Start transaction process
-            transaction.TransactionStatus = TransactionStatus.InProcess;
             bool availabilityOfMoney = true;
             if (transaction.TransactionType == TransactionType.Debit)
             {
-                debit = transaction;
-                credit = counterpartyTransaction;
                 if (counterpartyTransaction != null)
                 {
                     var counterpartyAccount =
@@ -80,8 +75,6 @@ namespace ModulebankProject.Features.Transactions.TransferTransaction
             }
             else
             {
-                debit = counterpartyTransaction;
-                credit = transaction;
                 var account = await _accountsRepository.GetAccountWithoutTransactions(transaction.AccountId);
                 if (account != null)
                 {
@@ -92,21 +85,21 @@ namespace ModulebankProject.Features.Transactions.TransferTransaction
 
             if (availabilityOfMoney)
             {
-                if (credit != null) creditResult = await _accountsRepository.ApplyTransaction(credit);
-                if (debit != null) debitResult = await _accountsRepository.ApplyTransaction(debit);
+                transactionResult = await _accountsRepository.ApplyTransaction(transaction, counterpartyTransaction);
+                if (!transactionResult.IsSuccess) return transactionResult;
             }
-            else return MbResult<TransactionStatus, ApiError>.Failure(new ApiError("Insufficient Funds", StatusCodes.Status403Forbidden));
+            else return MbResult<string, ApiError>.Failure(new ApiError("Insufficient Funds", StatusCodes.Status403Forbidden));
 
-            if (creditResult == "OK" && debitResult == "OK ")
+            if (transactionResult.Result == "OK")
             {
-                transaction.TransactionStatus = TransactionStatus.Completed;
-                return MbResult<TransactionStatus, ApiError>.Success(transaction.TransactionStatus);
+                await _transactionsRepository.SetTransactionStatus(transaction.Id, TransactionStatus.Completed);
+                return MbResult<string, ApiError>.Success(TransactionStatus.Completed.ToString());
             }
 
-            return MbResult<TransactionStatus, ApiError>.Failure(
+            return MbResult<string, ApiError>.Failure(
                 new ApiError("Transaction Error",
                     StatusCodes.Status500InternalServerError, 
-                    "TransactionStatus: " + TransactionStatus.Error +  $"  creditOperationResult: {creditResult}   debitOperationResult: {debitResult}"));
+                    "TransactionStatus: " + TransactionStatus.Error +  $" OperationResult: {transactionResult}"));
         }
     }
 }

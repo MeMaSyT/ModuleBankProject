@@ -1,4 +1,5 @@
 ﻿using ModulebankProject.Features.Transactions;
+using System.ComponentModel.DataAnnotations;
 
 namespace ModulebankProject.Features.Accounts
 {
@@ -43,6 +44,7 @@ namespace ModulebankProject.Features.Accounts
         /// <summary>
         /// Валюта
         /// </summary>
+        // ReSharper disable once EntityFramework.ModelValidation.UnlimitedStringLength
         public string Currency { get; set; }
         /// <summary>
         /// Текущий баланс
@@ -64,5 +66,8 @@ namespace ModulebankProject.Features.Accounts
         /// Транзакции
         /// </summary>
         public List<Transaction> Transactions { get; set; } = [];
+
+        [Timestamp]
+        public uint Version { get; set; }
     }
 }

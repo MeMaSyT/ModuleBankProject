@@ -1,8 +1,12 @@
 using FluentValidation;
+using Hangfire;
+using Hangfire.PostgreSql;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using ModulebankProject.Extensions;
 using ModulebankProject.Features.Accounts;
 using ModulebankProject.Features.Transactions;
+using ModulebankProject.Infrastructure.AccrueInterest;
 using ModulebankProject.Infrastructure.Data;
 using ModulebankProject.Infrastructure.Data.Repositories;
 using ModulebankProject.Middlewares;
@@ -40,13 +44,41 @@ namespace ModulebankProject
             builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
             //DATA
-            builder.Services.AddSingleton<IMyDataContext, MyDataContext>();
+            builder.Services.AddDbContext<ModulebankDataContext>(
+                options =>
+                {
+                    options.UseNpgsql(builder.Configuration.GetConnectionString(nameof(ModulebankDataContext)));
+                });
             builder.Services.AddScoped<IAccountsRepository, AccountsRepository>();
             builder.Services.AddScoped<ITransactionsRepository, TransactionsRepository>();
 
             //
+            /*
+            builder.Services.AddHangfire((_, config) =>
+            {
+                config
+                    .UsePostgreSqlStorage(options =>
+                        {
+                            options.UseNpgsqlConnection(builder.Configuration.GetConnectionString(nameof(ModulebankDataContext)));
+                        },
+                        new PostgreSqlStorageOptions
+                        {
+                            SchemaName = "hangfire",
+                            PrepareSchemaIfNecessary = true,
+                            EnableTransactionScopeEnlistment = true,
+                            UseNativeDatabaseTransactions = true
+                        });
+            });
+            builder.Services.AddHangfireServer();
+            */
+            builder.Services.AddScoped<AccrueInterestHandler>();
+            builder.Services.AddScoped<InterestAccrualService>();
+
             builder.Services.AddAuthorization();
-            builder.Services.AddAuth(builder.Configuration);
+            if (!builder.Environment.IsEnvironment("Testing"))
+            {
+                builder.Services.AddAuth(builder.Configuration);
+            }
 
             var app = builder.Build();
 
@@ -63,6 +95,10 @@ namespace ModulebankProject
 
             app.UseAuthentication();
             app.UseAuthorization();
+
+            //app.UseHangfireDashboard();
+            //BackgroundJob.Enqueue(() => Console.WriteLine("Hangfire is working!"));
+            //RecurringJob.AddOrUpdate<InterestAccrualService>("accrueInterestJob", service => service.InvokeHandler(), Cron.Daily(0, 30));
 
             app.Run();
         }

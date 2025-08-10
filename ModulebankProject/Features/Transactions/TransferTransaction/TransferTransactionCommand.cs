@@ -7,5 +7,5 @@ namespace ModulebankProject.Features.Transactions.TransferTransaction
     /// Command для проведения транзакции
     /// </summary>
     /// <param name="Id">Номер транзакции</param>
-    public record TransferTransactionCommand(Guid Id) : IRequest<MbResult<TransactionStatus, ApiError>>;
+    public record TransferTransactionCommand(Guid Id) : IRequest<MbResult<string, ApiError>>;
 }
