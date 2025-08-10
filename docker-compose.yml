@@ -6,6 +6,7 @@ services:
       dockerfile: ModulebankProject/Dockerfile
     depends_on:
       - keycloak
+      - postgres
     ports:
       - "80:8080"
     networks:
@@ -25,6 +26,21 @@ services:
         - ./.containers/identity:/opt/keycloak/data
     ports:
         - 18080:8080
+  
+  postgres:
+    image: postgres:latest
+    container_name: Postgres
+    environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: 123
+        POSTGRES_DB: ModulebankAccountsDb
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./.containers/postgres-data:/var/lib/postgresql/data
+    networks:
+      - my-network
+
 networks:
   my-network:
     driver: bridge

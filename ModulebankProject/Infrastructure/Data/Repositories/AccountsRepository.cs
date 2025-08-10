@@ -1,24 +1,27 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using ModulebankProject.Features.Accounts;
 using ModulebankProject.Features.Accounts.CreateAccount;
 using ModulebankProject.Features.Accounts.EditAccount;
 using ModulebankProject.Features.Transactions;
+using ModulebankProject.MbResult;
+using Npgsql;
 
 namespace ModulebankProject.Infrastructure.Data.Repositories
 {
     public class AccountsRepository : IAccountsRepository
     {
-        private readonly IMyDataContext _myDataContext;
+        private readonly ModulebankDataContext _dataContext;
         private readonly IMapper _mapper;
 
         // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
-        public AccountsRepository(IMyDataContext myDataContext, IMapper mapper)
+        public AccountsRepository(ModulebankDataContext dataContext, IMapper mapper)
         {
-            _myDataContext = myDataContext;
+            _dataContext = dataContext;
             _mapper = mapper;
         }
 
-        public async Task<Account> CreateAccount(CreateAccountCommand request)
+        public async Task<MbResult<Account, ApiError>> CreateAccount(CreateAccountCommand request)
         {
             var creatingAccount = new Account(
                 Guid.NewGuid(),
@@ -31,51 +34,76 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
                 request.CloseDate
             );
 
-            _myDataContext.Accounts.Add(creatingAccount);
-            await Task.Delay(500); //DataBase delay emulation
-
-            return creatingAccount;
-        }
-
-        public async Task<Account?> EditAccount(EditAccountCommand request)
-        {
-            var editingAccount = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == request.Id);
-            if (editingAccount != null)
+            await _dataContext.Accounts.AddAsync(creatingAccount);
+            try
             {
-                editingAccount.Currency = request.Currency ?? editingAccount.Currency;
-                editingAccount.InterestRate = request.InterestRate ?? editingAccount.InterestRate;
-                editingAccount.CloseDate = request.CloseDate ?? editingAccount.CloseDate;
+                await _dataContext.SaveChangesAsync();
             }
-            await Task.Delay(500); //DataBase delay emulation
+            catch (DbUpdateConcurrencyException)
+            {
+                return MbResult<Account, ApiError>.Failure(new ApiError("Conflict", StatusCodes.Status409Conflict));
+            }
+            
 
-            return editingAccount;
+            return MbResult<Account, ApiError>.Success(creatingAccount);
         }
-        public async Task<Guid> DeleteAccount(Guid id)
+
+        public async Task<MbResult<Account, ApiError>> EditAccount(EditAccountCommand request)
         {
-            var deletingAccount = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == id);
-            if (deletingAccount == null) return Guid.Empty;
+            var editingAccount = await _dataContext.Accounts
+                .FirstOrDefaultAsync(x => x.Id == request.Id);
+            if (editingAccount == null)
+                return MbResult<Account, ApiError>.Failure(new ApiError("AccountNotFound",
+                    StatusCodes.Status404NotFound));
 
-            _myDataContext.Accounts.Remove(deletingAccount);
-            await Task.Delay(500); //DataBase delay emulation
+            editingAccount.Currency = request.Currency ?? editingAccount.Currency;
+            editingAccount.InterestRate = request.InterestRate ?? editingAccount.InterestRate;
+            editingAccount.CloseDate = request.CloseDate ?? editingAccount.CloseDate;
 
-            return id;
+            try
+            {
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return MbResult<Account, ApiError>.Failure(new ApiError("Conflict", StatusCodes.Status409Conflict));
+            }
+
+            return MbResult<Account, ApiError>.Success(editingAccount);
+        }
+        public async Task<MbResult<Guid, ApiError>> DeleteAccount(Guid id)
+        {
+            int deletedAmount;
+            try
+            {
+                deletedAmount = await _dataContext.Accounts.Where(a => a.Id == id).ExecuteDeleteAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return MbResult<Guid, ApiError>.Failure(new ApiError("Conflict", StatusCodes.Status409Conflict));
+            }
+            
+            if (deletedAmount == 0) return MbResult<Guid, ApiError>.Failure(new ApiError("AccountNotFound",
+                StatusCodes.Status404NotFound));
+
+            return MbResult<Guid, ApiError>.Success(id);
         }
         public async Task<List<Account>> GetAccounts(Guid ownerId)
         {
-            List<Account> accounts = _myDataContext.Accounts
-                .Where(a => a.OwnerId == ownerId).ToList();
-            await Task.Delay(500); //DataBase delay emulation
+            List<Account> accounts = await _dataContext.Accounts
+                .AsNoTracking()
+                .Where(a => a.OwnerId == ownerId)
+                .ToListAsync();
 
             return accounts;
         }
         public async Task<AccountStatementDto?> GetAccountStatement(Guid id, DateTime startRangeDate, DateTime endRangeDate)
         {
-            var account = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == id);
+            var account = await _dataContext.Accounts
+                .AsNoTracking()
+                .Include(account => account.Transactions)
+                .FirstOrDefaultAsync(x => x.Id == id);
             if (account == null) return null;
-            await Task.Delay(500); //DataBase delay emulation
 
             AccountStatementDto result = new AccountStatementDto(
                 account.Id,
@@ -94,34 +122,138 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
         }
         public async Task<Account?> GetAccountWithoutTransactions(Guid id)
         {
-            var account = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == id);
-            await Task.Delay(500); //DataBase delay emulation
+            var account = await _dataContext.Accounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
 
             return account;
         }
         public async Task<bool> CheckAccountAvailability(Guid id)
         {
-            var account = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == id);
-            await Task.Delay(500); //DataBase delay emulation
+            var account = await _dataContext.Accounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
             if (account == null) return false;
 
             return true;
         }
-        public async Task<string> ApplyTransaction(Transaction transaction)
+        public async Task<MbResult<string, ApiError>> ApplyTransaction(Transaction transaction, Transaction? counterpartyTransaction = null)
         {
-            var account = _myDataContext.Accounts
-                .FirstOrDefault(x => x.Id == transaction.AccountId);
-            if (account == null) return "AccountNotFoundWhileApplyTransaction";
+            // ReSharper disable once ConvertToUsingDeclaration решарпер портит читабельность
+            await using (var t =
+                         await _dataContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
+            {
+                try
+                {
+                    var tr =
+                        await _dataContext.Transactions.FirstOrDefaultAsync(tr => tr.Id == transaction.Id);
+                    tr!.TransactionStatus = TransactionStatus.InProcess;
 
-            bool status = AccountHelper.TryChangeBalance(account.Balance, transaction.Amount * (int)transaction.TransactionType, out decimal result);
-            if (!status) return "ErrorWhileApplyTransaction";
-            account.Balance = result;
+                    var counterpartyResult = 0M;
+                    Account? counterpartyAccount = null;
 
-            await Task.Delay(500); //DataBase delay emulation
+                    //Get accounts
+                    var account = await _dataContext.Accounts
+                        .FirstOrDefaultAsync(x => x.Id == transaction.AccountId);
+                    if (account == null)
+                    {
+                        await t.RollbackAsync();
+                        return MbResult<string, ApiError>.Failure(new ApiError("AccountNotFoundWhileApplyTransaction", StatusCodes.Status404NotFound));
+                    }
 
-            return "OK";
+                    if (counterpartyTransaction != null)
+                    {
+                        counterpartyAccount = await _dataContext.Accounts
+                            .FirstOrDefaultAsync(x => x.Id == counterpartyTransaction.AccountId);
+                        if (counterpartyAccount == null)
+                        {
+                            await t.RollbackAsync();
+                            return MbResult<string, ApiError>.Failure(
+                                new ApiError("CounterpartyAccountNotFoundWhileApplyTransaction",
+                                    StatusCodes.Status404NotFound));
+                        }
+                    }
+
+                    //Set before balances
+                    var beforeAccountBalance = account.Balance;
+                    var beforeCounterpartyAccountBalance = 0M;
+                    if (counterpartyAccount != null) beforeCounterpartyAccountBalance = counterpartyAccount.Balance;
+
+                    //Get Statuses
+                    var status = AccountHelper.TryChangeBalance(beforeAccountBalance,
+                        transaction.Amount * (int)transaction.TransactionType, out var result);
+                    if (!status)
+                    {
+                        await t.RollbackAsync();
+                        return MbResult<string, ApiError>.Failure(new ApiError("ErrorWhileApplyTransaction", StatusCodes.Status403Forbidden));
+                    }
+
+                    if (counterpartyTransaction != null)
+                    {
+                        var counterpartyStatus = AccountHelper.TryChangeBalance(counterpartyAccount!.Balance,
+                            counterpartyTransaction.Amount * (int)counterpartyTransaction.TransactionType, out counterpartyResult);
+                        if (!counterpartyStatus)
+                        {
+                            await t.RollbackAsync();
+                            return MbResult<string, ApiError>.Failure(
+                                new ApiError("ErrorWhileApplyCounterpartyTransaction", StatusCodes.Status404NotFound));
+                        }
+                    }
+
+                    //Change balances
+                    account.Balance = result;
+                    if (counterpartyAccount != null)
+                    {
+                        beforeCounterpartyAccountBalance = counterpartyAccount.Balance;
+                        counterpartyAccount.Balance = counterpartyResult;
+                    }
+
+                    //Сверка сумм
+                    if (beforeAccountBalance != result - transaction.Amount * (int)transaction.TransactionType)
+                    {
+                        await t.RollbackAsync();
+                        return MbResult<string, ApiError>.Failure(
+                            new ApiError($"TransactionValuesNotEqual: before={beforeAccountBalance} checkValue={result - transaction.Amount * (int)transaction.TransactionType} ", StatusCodes.Status500InternalServerError));
+                    }
+                    if (counterpartyTransaction != null)
+                    {
+                        if (beforeCounterpartyAccountBalance != counterpartyResult - counterpartyTransaction.Amount * (int)counterpartyTransaction.TransactionType)
+                        {
+                            await t.RollbackAsync();
+                            return MbResult<string, ApiError>.Failure(
+                                new ApiError($"TransactionValuesNotEqual: before={beforeCounterpartyAccountBalance} checkValue={counterpartyResult - counterpartyTransaction.Amount * -(int)transaction.TransactionType} ", StatusCodes.Status500InternalServerError));
+                        }
+                    }
+
+                    try
+                    {
+                        await _dataContext.SaveChangesAsync();
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        await t.RollbackAsync();
+                        return MbResult<string, ApiError>.Failure(new ApiError("Concurrency conflict", StatusCodes.Status409Conflict));
+                    }
+                    catch (InvalidOperationException ex) when (ex.InnerException is DbUpdateException
+                                                               {
+                                                                   InnerException: PostgresException pgEx
+                                                                   // ReSharper disable once MergeIntoPattern предлагает фигню
+                                                               } &&
+                                                               pgEx.SqlState == "40001")
+                    {
+                        return MbResult<string, ApiError>.Failure(new ApiError("Concurrency conflict", StatusCodes.Status409Conflict));
+                    }
+                    await t.CommitAsync();
+
+                    return MbResult<string, ApiError>.Success("OK");
+                }
+                catch (PostgresException e)
+                {
+                    await t.RollbackAsync();
+                    Console.WriteLine("Error: " + e);
+                    return MbResult<string, ApiError>.Failure(new ApiError(e.Message, StatusCodes.Status500InternalServerError));
+                }
+            }
         }
     }
 }

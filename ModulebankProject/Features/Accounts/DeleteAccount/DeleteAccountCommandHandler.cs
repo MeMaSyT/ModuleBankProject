@@ -17,9 +17,11 @@ namespace ModulebankProject.Features.Accounts.DeleteAccount
         public async Task<MbResult<Guid, ApiError>> Handle(DeleteAccountCommand request, CancellationToken cancellationToken)
         {
             var deleteId = await _accountsRepository.DeleteAccount(request.Id);
-            if(deleteId == Guid.Empty) return MbResult<Guid, ApiError>.Failure(new ApiError("Deleting Account Not Found", StatusCodes.Status404NotFound));
+            if (!deleteId.IsSuccess) return MbResult<Guid, ApiError>.Failure(deleteId.Error!);
 
-            return MbResult<Guid, ApiError>.Success(deleteId);
+            if (deleteId.Result == Guid.Empty) return MbResult<Guid, ApiError>.Failure(new ApiError("Deleting Account Not Found", StatusCodes.Status404NotFound));
+
+            return MbResult<Guid, ApiError>.Success(deleteId.Result);
         }
     }
 }

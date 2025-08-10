@@ -1,4 +1,6 @@
-﻿namespace ModulebankProject.Features.Transactions
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ModulebankProject.Features.Transactions
 {
     /// <summary>
     /// Модель транзакции
@@ -47,6 +49,7 @@
         /// <summary>
         /// Валюта
         /// </summary>
+        // ReSharper disable once EntityFramework.ModelValidation.UnlimitedStringLength
         public string Currency { get; set; }
         /// <summary>
         /// Тип транзакции
@@ -55,6 +58,7 @@
         /// <summary>
         /// Описание
         /// </summary>
+        // ReSharper disable once EntityFramework.ModelValidation.UnlimitedStringLength
         public string Description { get; set; }
         /// <summary>
         /// Время транзакции
@@ -64,5 +68,8 @@
         /// Статус транзакции
         /// </summary>
         public TransactionStatus TransactionStatus { get; set; }
+
+        [Timestamp]
+        public uint Version { get; set; }
     }
 }
