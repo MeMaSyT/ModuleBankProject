@@ -1,6 +1,4 @@
 ﻿using MediatR;
-using ModulebankProject.Features.Accounts;
-using ModulebankProject.Features.Accounts.CreateAccount;
 using ModulebankProject.Features.Transactions;
 using ModulebankProject.Features.Transactions.RegisterTransaction;
 using ModulebankProject.MbResult;
