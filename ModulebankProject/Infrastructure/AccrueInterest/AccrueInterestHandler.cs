@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ModulebankProject.Features.Outbox;
 using ModulebankProject.Infrastructure.Data;
 using Npgsql;
 
@@ -24,6 +25,20 @@ namespace ModulebankProject.Infrastructure.AccrueInterest
                     accountId);
 
                 await transaction.CommitAsync();
+
+                var accrueEvent = new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    Content = "InterestRete",
+                    Error = "",
+                    Type = "money.*",
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["Type"] = "Accrue"
+                    }
+                };
+                await _dataContext.OutboxMessages.AddAsync(accrueEvent);
+                await _dataContext.SaveChangesAsync();
             }
             catch (PostgresException ex) when (ex.SqlState == "P0001")
             {

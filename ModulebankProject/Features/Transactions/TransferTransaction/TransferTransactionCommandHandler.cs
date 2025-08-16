@@ -1,4 +1,8 @@
-﻿using MediatR;
+﻿using System.Text.Json;
+using MediatR;
+using ModulebankProject.Features.Inbox.Events;
+using ModulebankProject.Features.Inbox.Events.AccountOpened;
+using ModulebankProject.Features.Outbox;
 using ModulebankProject.Features.Transactions.RegisterTransaction;
 using ModulebankProject.Infrastructure.Data.Repositories;
 using ModulebankProject.MbResult;
@@ -87,6 +91,78 @@ namespace ModulebankProject.Features.Transactions.TransferTransaction
             {
                 transactionResult = await _accountsRepository.ApplyTransaction(transaction, counterpartyTransaction);
                 if (!transactionResult.IsSuccess) return transactionResult;
+
+                Transaction? debit = null;
+                Transaction? credit = null;
+                if (transaction.TransactionType == TransactionType.Debit)
+                {
+                    debit = transaction;
+                    if (counterpartyTransaction != null) credit = counterpartyTransaction;
+                }
+                else
+                {
+                    credit = transaction;
+                    if (counterpartyTransaction != null) debit = counterpartyTransaction;
+                }
+
+                if (debit != null)
+                {
+                    request.Events.Add(new OutboxMessage
+                    {
+                        Id = Guid.NewGuid(),
+                        Content = JsonSerializer.Serialize(new MoneyDebitedEvent
+                        {
+                            AccountId = debit.AccountId,
+                            Amount = debit.Amount,
+                            Currency = debit.Currency,
+                            OperationId = debit.Id
+                        }),
+                        Error = "",
+                        Type = "money.*",
+                        Properties = new Dictionary<string, object>
+                        {
+                            ["Type"] = "Debit"
+                        }
+                    });
+                }
+                if (credit != null)
+                {
+                    request.Events.Add(new OutboxMessage
+                    {
+                        Id = Guid.NewGuid(),
+                        Content = JsonSerializer.Serialize(new MoneyCreditedEvent()
+                        {
+                            AccountId = credit.AccountId,
+                            Amount = credit.Amount,
+                            Currency = credit.Currency,
+                            OperationId = credit.Id
+                        }),
+                        Error = "",
+                        Type = "account.*",
+                        Properties = new Dictionary<string, object>
+                        {
+                            ["Type"] = "Credit"
+                        }
+                    });
+                }
+                request.Events.Add(new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    Content = JsonSerializer.Serialize(new TransferCompletedEvent()
+                    {
+                        SourceAccountId = transaction.AccountId,
+                        DestinationAccountId = counterpartyTransaction?.AccountId ?? Guid.Empty,
+                        Amount = transaction.Amount,
+                        Currency = transaction.Currency,
+                        TransferId = transaction.Id
+                    }),
+                    Error = "",
+                    Type = "account.*",
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["Type"] = "Transfer"
+                    }
+                });
             }
             else return MbResult<string, ApiError>.Failure(new ApiError("Insufficient Funds", StatusCodes.Status403Forbidden));
 

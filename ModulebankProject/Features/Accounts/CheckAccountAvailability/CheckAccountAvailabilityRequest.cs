@@ -1,5 +1,7 @@
 ﻿using MediatR;
+using ModulebankProject.Features.Outbox;
 using ModulebankProject.MbResult;
+using ModulebankProject.PipelineBehaviors.Outbox;
 
 namespace ModulebankProject.Features.Accounts.CheckAccountAvailability
 {

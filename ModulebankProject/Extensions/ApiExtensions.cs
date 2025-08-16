@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using ModulebankProject.Features.Inbox.Events;
+using ModulebankProject.HealthCheck;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace ModulebankProject.Extensions
 {
@@ -10,6 +13,7 @@ namespace ModulebankProject.Extensions
             IConfiguration configuration)
         {
             services.AddOpenApi();
+            services.AddSwaggerExamplesFromAssemblyOf<Program>();
             services.AddSwaggerGen(options =>
             {
                 var basePath = AppContext.BaseDirectory;
@@ -56,6 +60,11 @@ namespace ModulebankProject.Extensions
                     }
                 };
                 options.AddSecurityRequirement(securityRequirement);
+
+                options.DocumentFilter<HealthCheckDocumentFilter>();
+
+                options.ExampleFilters();
+                options.DocumentFilter<EventDocumentFilter>();
             });
             return services;
         }

@@ -4,9 +4,14 @@ services:
     build:
       context: .
       dockerfile: ModulebankProject/Dockerfile
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=admin
     depends_on:
       - keycloak
       - postgres
+      - rabbitmq
     ports:
       - "80:8080"
     networks:
@@ -38,6 +43,21 @@ services:
       - "5433:5432"
     volumes:
       - ./.containers/postgres-data:/var/lib/postgresql/data
+    networks:
+      - my-network
+
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ./.containers/rabbitmq_data:/var/lib/rabbitmq
     networks:
       - my-network
 

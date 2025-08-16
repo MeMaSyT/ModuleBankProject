@@ -62,9 +62,11 @@ namespace ModulebankProject.Features.Accounts
         /// Дата закрытия счёта
         /// </summary>
         public DateTime CloseDate { get; set; }
+
         /// <summary>
         /// Транзакции
         /// </summary>
+        public bool Freezing { get; set; } = false;
         public List<Transaction> Transactions { get; set; } = [];
 
         [Timestamp]
