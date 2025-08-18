@@ -3,6 +3,7 @@ using ModulebankProject.Features.Outbox;
 using ModulebankProject.Infrastructure.Data;
 using RabbitMQ.Client;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text;
 
 namespace ModulebankProject.Infrastructure.RabbitMq
@@ -24,18 +25,29 @@ namespace ModulebankProject.Infrastructure.RabbitMq
             _logger = logger;
         }
 
-        public async Task PublishPendingEventsAsync(CancellationToken cancellationToken)
+        public async Task<bool> PublishPendingEventsAsync(CancellationToken cancellationToken)
         {
-            _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            try
+            {
+                _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize RabbitMQ connection");
+                return false;
+            }
+            
 
             var messages = await _dbContext.Set<OutboxMessage>()
                 .Where(m => m.ProcessedOn == null)
                 .OrderBy(m => m.OccurredOn)
                 .Take(100)
                 .ToListAsync(cancellationToken);
+            var counter = 0;
 
             foreach (var message in messages)
             {
+                Console.WriteLine("COntent = " + message.Content);
                 var props = new BasicProperties();
                 if (message.Properties != null)
                 {
@@ -65,6 +77,7 @@ namespace ModulebankProject.Infrastructure.RabbitMq
                         LatencyMs = stopwatch.ElapsedMilliseconds,
                         MessageSize = body.Length
                     });
+                    counter++;
                 }
                 catch (Exception ex)
                 {
@@ -79,6 +92,7 @@ namespace ModulebankProject.Infrastructure.RabbitMq
                     await _dbContext.SaveChangesAsync(cancellationToken);
                 }
             }
+            return messages.Count == counter ? true : false;
         }
     }
 }

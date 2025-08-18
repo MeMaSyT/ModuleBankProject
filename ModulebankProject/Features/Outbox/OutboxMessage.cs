@@ -2,7 +2,7 @@
 
 namespace ModulebankProject.Features.Outbox
 {
-    public class OutboxMessage
+    public class    OutboxMessage
     {
         public Guid Id { get; set; }
         public string Type { get; set; } = "Base";

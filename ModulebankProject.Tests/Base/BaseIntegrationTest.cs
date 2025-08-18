@@ -9,13 +9,15 @@ namespace ModulebankProject.Tests.Base
         protected readonly ISender Sender;
         protected readonly ModulebankDataContext DbContext;
         protected readonly HttpClient Client;
+        private readonly IServiceScope _scope;
         // ReSharper disable once PublicConstructorInAbstractClass не хочу первичный конструктор
         public BaseIntegrationTest(IntegrationTestWebAppFactory factory)
         {
-            var scope = factory.Services.CreateScope();
+            //_scope = factory.Services.CreateScope();
+            _scope = factory.Server.Services.CreateScope();
 
-            Sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            DbContext = scope.ServiceProvider.GetRequiredService<ModulebankDataContext>();
+            Sender = _scope.ServiceProvider.GetRequiredService<ISender>();
+            DbContext = _scope.ServiceProvider.GetRequiredService<ModulebankDataContext>();
             Client = factory.CreateClient();
         }
     }

@@ -160,6 +160,11 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
                         await t.RollbackAsync();
                         return MbResult<string, ApiError>.Failure(new ApiError("AccountNotFoundWhileApplyTransaction", StatusCodes.Status404NotFound));
                     }
+                    if (account.Freezing == true)
+                    {
+                        await t.RollbackAsync();
+                        return MbResult<string, ApiError>.Failure(new ApiError("AccountIsFreezing", StatusCodes.Status409Conflict));
+                    }
 
                     if (counterpartyTransaction != null)
                     {
@@ -171,6 +176,11 @@ namespace ModulebankProject.Infrastructure.Data.Repositories
                             return MbResult<string, ApiError>.Failure(
                                 new ApiError("CounterpartyAccountNotFoundWhileApplyTransaction",
                                     StatusCodes.Status404NotFound));
+                        }
+                        if (counterpartyAccount.Freezing == true)
+                        {
+                            await t.RollbackAsync();
+                            return MbResult<string, ApiError>.Failure(new ApiError("CounterpartyAccountIsFreezing", StatusCodes.Status409Conflict));
                         }
                     }
 

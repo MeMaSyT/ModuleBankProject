@@ -2,6 +2,6 @@
 {
     public interface IEventPublisher
     {
-        Task PublishPendingEventsAsync(CancellationToken cancellationToken);
+        Task<bool> PublishPendingEventsAsync(CancellationToken cancellationToken);
     }
 }

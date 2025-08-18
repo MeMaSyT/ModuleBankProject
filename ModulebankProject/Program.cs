@@ -69,7 +69,7 @@ namespace ModulebankProject
                     cfg.AddProfile<MappingAccount>();
                 });
                 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-                builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionalOutboxBehavior<,>));
+                if(!builder.Environment.IsEnvironment("Testing")) builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionalOutboxBehavior<,>));
                 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
                 //DATA
@@ -110,8 +110,10 @@ namespace ModulebankProject
                 builder.Services.AddScoped<AccrueInterestHandler>();
                 builder.Services.AddScoped<InterestAccrualService>();
 
-                //RabbitMQ
-                builder.Services.AddSingleton<IConnection>(sp =>
+                if (!builder.Environment.IsEnvironment("Testing"))
+                {
+                    //RabbitMQ
+                    builder.Services.AddSingleton<IConnection>(sp =>
                 {
                     var factory = new ConnectionFactory
                     {
@@ -122,20 +124,20 @@ namespace ModulebankProject
                     };
                     return factory.CreateConnectionAsync().Result;
                 });
-                builder.Services.AddSingleton<IChannel>(sp =>
-                {
-                    var connection = sp.GetRequiredService<IConnection>();
-                    var channel = connection.CreateChannelAsync().Result;
+                    builder.Services.AddSingleton<IChannel>(sp =>
+                    {
+                        var connection = sp.GetRequiredService<IConnection>();
+                        var channel = connection.CreateChannelAsync().Result;
 
-                    ConfigureRabbitMqTopology(channel);
+                        ConfigureRabbitMqTopology(channel);
 
-                    return channel;
-                });
-                builder.Services.AddHostedService<AntifraudConsumer>();
-                builder.Services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
-                builder.Services.AddScoped<IAntifraudEventHandler, AntifraudEventHandler>();
-                builder.Services.AddHostedService<OutboxBackgroundService>();
-
+                        return channel;
+                    });
+                    builder.Services.AddHostedService<AntifraudConsumer>();
+                    builder.Services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
+                    builder.Services.AddScoped<IAntifraudEventHandler, AntifraudEventHandler>();
+                    builder.Services.AddHostedService<OutboxBackgroundService>();
+                }
 
                 builder.Services.AddAuthorization();
                 if (!builder.Environment.IsEnvironment("Testing"))
