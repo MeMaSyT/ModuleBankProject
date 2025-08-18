@@ -1,5 +1,4 @@
-﻿// ReSharper disable UnusedMember.Global это чисто описание для API
-namespace ModulebankProject.Features.Inbox.Events;
+﻿namespace ModulebankProject.Features.Inbox.Events;
 
 public class InterestAccruedEvent : EventBase
 {

@@ -1,32 +1,32 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ModulebankProject.Infrastructure.Data;
 
-namespace ModulebankProject.Infrastructure.RabbitMq.AntifraudConsumer;
-
-public class AntifraudEventHandler : IAntifraudEventHandler
+namespace ModulebankProject.Infrastructure.RabbitMq.AntifraudConsumer
 {
-    private readonly ModulebankDataContext _dbContext;
-    private readonly ILogger<AntifraudEventHandler> _logger;
-
-    // ReSharper disable once ConvertToPrimaryConstructor
-    public AntifraudEventHandler(ModulebankDataContext dbContext, ILogger<AntifraudEventHandler> logger)
+    public class AntifraudEventHandler : IAntifraudEventHandler
     {
-        _dbContext = dbContext;
-        _logger = logger;
-    }
+        private readonly ModulebankDataContext _dbContext;
+        private readonly ILogger<AntifraudEventHandler> _logger;
 
-    public async Task HandleAsync(Guid clientId, bool isFreeze, CancellationToken cancellationToken)
-    {
-        var accounts = await _dbContext.Accounts
-            .Where(x => x.OwnerId == clientId)
-            .ToListAsync(cancellationToken: cancellationToken);
-
-        foreach (var account in accounts)
+        public AntifraudEventHandler(ModulebankDataContext dbContext, ILogger<AntifraudEventHandler> logger)
         {
-            account.Freezing = isFreeze;
+            _dbContext = dbContext;
+            _logger = logger;
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Accounts of client " + clientId + " freezing is " + isFreeze);
+        public async Task HandleAsync(Guid clientId, bool isFreeze, CancellationToken cancellationToken)
+        {
+            var accounts = await _dbContext.Accounts
+                .Where(x => x.OwnerId == clientId)
+                .ToListAsync(cancellationToken: cancellationToken);
+
+            foreach (var account in accounts)
+            {
+                account.Freezing = isFreeze;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Accounts of client " + clientId + " freezing is " + isFreeze);
+        }
     }
 }

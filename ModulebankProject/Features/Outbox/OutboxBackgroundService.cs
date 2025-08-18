@@ -1,36 +1,37 @@
 ﻿using ModulebankProject.Infrastructure.RabbitMq;
 
-namespace ModulebankProject.Features.Outbox;
-
-public class OutboxBackgroundService : BackgroundService
+namespace ModulebankProject.Features.Outbox
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
-
-    // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
-    public OutboxBackgroundService(
-        IServiceProvider serviceProvider)
+    public class OutboxBackgroundService : BackgroundService
     {
-        _serviceProvider = serviceProvider;
-    }
+        private readonly IServiceProvider _serviceProvider;
+        private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
+        public OutboxBackgroundService(
+            IServiceProvider serviceProvider,
+            ILogger<OutboxBackgroundService> logger)
         {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
-                await publisher.PublishPendingEventsAsync(stoppingToken);
-                Console.WriteLine("AwakePublish!");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error processing outbox messages \n" + ex);
-            }
+            _serviceProvider = serviceProvider;
+        }
 
-            await Task.Delay(_interval, stoppingToken);
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
+                    await publisher.PublishPendingEventsAsync(stoppingToken);
+                    Console.WriteLine("AwakePublish!");
+                }
+                catch (Exception ex)
+                {
+                   Console.WriteLine("Error processing outbox messages \n" + ex);
+                }
+
+                await Task.Delay(_interval, stoppingToken);
+            }
         }
     }
 }

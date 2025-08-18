@@ -17,10 +17,10 @@ public class AuditConsumer : BackgroundService
     private readonly ILogger<RabbitMqEventPublisher> _logger;
     private const string QueueName = "account.audit";
 
-    // ReSharper disable once ConvertToPrimaryConstructor
     public AuditConsumer(
         IChannel channel,
-        IServiceProvider serviceProvider, ILogger<RabbitMqEventPublisher> logger)
+        IServiceProvider serviceProvider,
+        IConfiguration configuration, ILogger<RabbitMqEventPublisher> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -40,8 +40,9 @@ public class AuditConsumer : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(_channel);
         Console.WriteLine("Audit Consumer is listening");
 
-        consumer.ReceivedAsync += async (_, ea) =>
+        consumer.ReceivedAsync += async (model, ea) =>
         {
+            var eventType = ea.BasicProperties.Type;
             var stopwatch = Stopwatch.StartNew();
             var correlationId = ea.BasicProperties.CorrelationId;
             try
@@ -104,7 +105,7 @@ public class AuditConsumer : BackgroundService
             await Task.Delay(1000, stoppingToken);
         }
     }
-    private static async Task QuarantineMessageAsync(
+    private async Task QuarantineMessageAsync(
         ModulebankDataContext dbContext,
         string error, InboxMessage message)
     {

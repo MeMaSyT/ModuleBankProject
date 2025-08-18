@@ -2,75 +2,76 @@
 using ModulebankProject.Features.Inbox.Events.AccountOpened;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace ModulebankProject.Features.Inbox.Events;
-
-public class EventDocumentFilter : IDocumentFilter
+namespace ModulebankProject.Features.Inbox.Events
 {
-    private static readonly Type[] EventTypes =
-    [
-        typeof(AccountOpenedEvent),
-        typeof(MoneyCreditedEvent),
-        typeof(MoneyDebitedEvent),
-        typeof(TransferCompletedEvent),
-        typeof(InterestAccruedEvent),
-        typeof(ClientChangeBlockEvent)
-    ];
-
-    public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+    public class EventDocumentFilter : IDocumentFilter
     {
-        // добавляем тег Events
-        swaggerDoc.Tags ??= new List<OpenApiTag>();
-        if (swaggerDoc.Tags.All(t => t.Name != "Events"))
-            swaggerDoc.Tags.Add(new OpenApiTag { Name = "Events", Description = "Event contracts" });
-
-        // добавляем схемы если ещё нет
-        foreach (var t in EventTypes)
+        private static readonly Type[] EventTypes = new[]
         {
-            if (!swaggerDoc.Components.Schemas.ContainsKey(t.Name))
-                swaggerDoc.Components.Schemas[t.Name] = context.SchemaGenerator.GenerateSchema(t, context.SchemaRepository);
-        }
+            typeof(AccountOpenedEvent),
+            typeof(MoneyCreditedEvent),
+            typeof(MoneyDebitedEvent),
+            typeof(TransferCompletedEvent),
+            typeof(InterestAccruedEvent),
+            typeof(ClientChangeBlockEvent),
+        };
 
-        // добавляем пути/операции для каждого события
-        swaggerDoc.Paths ??= new OpenApiPaths();
-
-        foreach (var t in EventTypes)
+        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
         {
-            var path = $"/events/{t.Name}"; // можно поменять путь на удобный для вас
-            var operation = new OpenApiOperation
+            // добавляем тег Events
+            swaggerDoc.Tags ??= new List<OpenApiTag>();
+            if (!swaggerDoc.Tags.Any(t => t.Name == "Events"))
+                swaggerDoc.Tags.Add(new OpenApiTag { Name = "Events", Description = "Event contracts" });
+
+            // добавляем схемы если ещё нет
+            foreach (var t in EventTypes)
             {
-                Tags = new List<OpenApiTag> { new() { Name = "Events" } },
-                Summary = $"Schema for {t.Name}",
-                Description = $"Возвращает контракт события {t.Name}",
-                Responses = new OpenApiResponses
+                if (!swaggerDoc.Components.Schemas.ContainsKey(t.Name))
+                    swaggerDoc.Components.Schemas[t.Name] = context.SchemaGenerator.GenerateSchema(t, context.SchemaRepository);
+            }
+
+            // добавляем пути/операции для каждого события
+            swaggerDoc.Paths ??= new OpenApiPaths();
+
+            foreach (var t in EventTypes)
+            {
+                var path = $"/events/{t.Name}"; // можно поменять путь на удобный для вас
+                var operation = new OpenApiOperation
                 {
-                    ["200"] = new()
+                    Tags = new List<OpenApiTag> { new OpenApiTag { Name = "Events" } },
+                    Summary = $"Schema for {t.Name}",
+                    Description = $"Возвращает контракт события {t.Name}",
+                    Responses = new OpenApiResponses
                     {
-                        Description = "Event schema",
-                        Content = new Dictionary<string, OpenApiMediaType>
+                        ["200"] = new OpenApiResponse
                         {
-                            ["application/json"] = new()
+                            Description = "Event schema",
+                            Content = new Dictionary<string, OpenApiMediaType>
                             {
-                                Schema = new OpenApiSchema
+                                ["application/json"] = new OpenApiMediaType
                                 {
-                                    Reference = new OpenApiReference
+                                    Schema = new OpenApiSchema
                                     {
-                                        Type = ReferenceType.Schema,
-                                        Id = t.Name
+                                        Reference = new OpenApiReference
+                                        {
+                                            Type = ReferenceType.Schema,
+                                            Id = t.Name
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            };
+                };
 
-            swaggerDoc.Paths[path] = new OpenApiPathItem
-            {
-                Operations = new Dictionary<OperationType, OpenApiOperation>
+                swaggerDoc.Paths[path] = new OpenApiPathItem
                 {
-                    [OperationType.Get] = operation
-                }
-            };
+                    Operations = new Dictionary<OperationType, OpenApiOperation>
+                    {
+                        [OperationType.Get] = operation
+                    }
+                };
+            }
         }
     }
 }
