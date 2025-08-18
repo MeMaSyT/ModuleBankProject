@@ -1,14 +1,15 @@
-﻿namespace ModulebankProject.Features.Accounts;
-
-public class AccountHelper
+﻿namespace ModulebankProject.Features.Accounts
 {
-    public static bool TryChangeBalance(decimal balance, decimal value, out decimal result)
+    public class AccountHelper
     {
-        result = -1;
-        var tempValue = balance + value;
-        if (tempValue < 0) return false;
+        public static bool TryChangeBalance(decimal balance, decimal value, out decimal result)
+        {
+            result = -1;
+            decimal tempValue = balance + value;
+            if (tempValue < 0) return false;
 
-        result = tempValue;
-        return true;
+            result = tempValue;
+            return true;
+        }
     }
 }

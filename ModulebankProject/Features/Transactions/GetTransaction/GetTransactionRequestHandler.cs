@@ -3,30 +3,31 @@ using MediatR;
 using ModulebankProject.Infrastructure.Data.Repositories;
 using ModulebankProject.MbResult;
 
-namespace ModulebankProject.Features.Transactions.GetTransaction;
-
-// ReSharper disable once UnusedMember.Global используется медиатором, решарпер слишком глуп, чтобы это понять
-public class GetTransactionRequestHandler : IRequestHandler<GetTransactionRequest, MbResult<TransactionDto, ApiError>>
+namespace ModulebankProject.Features.Transactions.GetTransaction
 {
-    private readonly ITransactionsRepository _transactionsRepository;
-    private readonly IMapper _mapper;
-
-    // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
-    public GetTransactionRequestHandler(IMapper mapper, ITransactionsRepository transactionsRepository)
+    // ReSharper disable once UnusedMember.Global используется медиатором, решарпер слишком глуп, чтобы это понять
+    public class GetTransactionRequestHandler : IRequestHandler<GetTransactionRequest, MbResult<TransactionDto, ApiError>>
     {
-        _mapper = mapper;
-        _transactionsRepository = transactionsRepository;
-    }
+        private readonly ITransactionsRepository _transactionsRepository;
+        private readonly IMapper _mapper;
 
-    public async Task<MbResult<TransactionDto, ApiError>> Handle(GetTransactionRequest request,
-        CancellationToken cancellationToken)
-    {
-        var transaction = await _transactionsRepository.GetTransaction(request.Id);
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
+        public GetTransactionRequestHandler(IMapper mapper, ITransactionsRepository transactionsRepository)
+        {
+            _mapper = mapper;
+            _transactionsRepository = transactionsRepository;
+        }
 
-        if (transaction == null)
-            return MbResult<TransactionDto, ApiError>.Failure(new ApiError("Transaction Not Found",
-                StatusCodes.Status404NotFound));
+        public async Task<MbResult<TransactionDto, ApiError>> Handle(GetTransactionRequest request,
+            CancellationToken cancellationToken)
+        {
+            var transaction = await _transactionsRepository.GetTransaction(request.Id);
 
-        return MbResult<TransactionDto, ApiError>.Success(_mapper.Map<TransactionDto>(transaction));
+            if (transaction == null)
+                return MbResult<TransactionDto, ApiError>.Failure(new ApiError("Transaction Not Found",
+                    StatusCodes.Status404NotFound));
+
+            return MbResult<TransactionDto, ApiError>.Success(_mapper.Map<TransactionDto>(transaction));
+        }
     }
 }

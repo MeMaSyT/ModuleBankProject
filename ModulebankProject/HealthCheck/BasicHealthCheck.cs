@@ -1,12 +1,13 @@
 ﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace ModulebankProject.HealthCheck;
-
-public class BasicHealthCheck : IHealthCheck
+namespace ModulebankProject.HealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = new())
+    public class BasicHealthCheck : IHealthCheck
     {
-        return Task.FromResult(
-            HealthCheckResult.Healthy("Application is running"));
+        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = new())
+        {
+            return Task.FromResult(
+                HealthCheckResult.Healthy("Application is running"));
+        }
     }
 }

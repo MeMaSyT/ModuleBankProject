@@ -1,20 +1,21 @@
 ﻿using FluentValidation;
 using ModulebankProject.Infrastructure;
 
-namespace ModulebankProject.Features.Accounts.EditAccount;
-
-// ReSharper disable once UnusedMember.Global используется медиатором, решарпер слишком глуп, чтобы это понять
-public class EditAccountCommandValidator : AbstractValidator<EditAccountCommand>
+namespace ModulebankProject.Features.Accounts.EditAccount
 {
-    public EditAccountCommandValidator()
+    // ReSharper disable once UnusedMember.Global используется медиатором, решарпер слишком глуп, чтобы это понять
+    public class EditAccountCommandValidator : AbstractValidator<EditAccountCommand>
     {
-        RuleFor(x => x.Id)
-            .NotEmpty()
-            .NotEqual(Guid.Empty)
-            .WithMessage("The Id cannot be empty");
+        public EditAccountCommandValidator()
+        {
+            RuleFor(x => x.Id)
+                .NotEmpty()
+                .NotEqual(Guid.Empty)
+                .WithMessage("The Id cannot be empty");
 
-        RuleFor(x => x.Currency)
-            .Must(c => CurrencyService.GetCurrency(c) != "")
-            .WithMessage("The Currency must be one of the list of currencies");
+            RuleFor(x => x.Currency)
+                .Must(c => CurrencyService.GetCurrency(c) != "")
+                .WithMessage("The Currency must be one of the list of currencies");
+        }
     }
 }

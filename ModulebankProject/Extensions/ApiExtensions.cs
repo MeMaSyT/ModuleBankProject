@@ -5,82 +5,83 @@ using ModulebankProject.Features.Inbox.Events;
 using ModulebankProject.HealthCheck;
 using Swashbuckle.AspNetCore.Filters;
 
-namespace ModulebankProject.Extensions;
-
-public static class ApiExtensions
+namespace ModulebankProject.Extensions
 {
-    public static IServiceCollection AddCustomSwagger(this IServiceCollection services,
-        IConfiguration configuration)
+    public static class ApiExtensions
     {
-        services.AddOpenApi();
-        services.AddSwaggerExamplesFromAssemblyOf<Program>();
-        services.AddSwaggerGen(options =>
+        public static IServiceCollection AddCustomSwagger(this IServiceCollection services,
+            IConfiguration configuration)
         {
-            var basePath = AppContext.BaseDirectory;
-
-            var xmlPath = Path.Combine(basePath, "ModulebankProject.xml");
-            options.UseInlineDefinitionsForEnums();
-            options.IncludeXmlComments(xmlPath);
-
-            options.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
-
-            options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
+            services.AddOpenApi();
+            services.AddSwaggerExamplesFromAssemblyOf<Program>();
+            services.AddSwaggerGen(options =>
             {
-                Type = SecuritySchemeType.OAuth2,
-                Flows = new OpenApiOAuthFlows
-                {
-                    Implicit = new OpenApiOAuthFlow
-                    {
-                        AuthorizationUrl = new Uri(configuration["Keycloak:AuthUrl"]!)
+                var basePath = AppContext.BaseDirectory;
 
-                        /*Scopes = new Dictionary<string, string>
+                var xmlPath = Path.Combine(basePath, "ModulebankProject.xml");
+                options.UseInlineDefinitionsForEnums();
+                options.IncludeXmlComments(xmlPath);
+
+                options.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
+
+                options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.OAuth2,
+                    Flows = new OpenApiOAuthFlows
+                    {
+                        Implicit = new OpenApiOAuthFlow
                         {
-                            {"openid", "openid"},
-                            {"profile", "profile"}
-                        }*/
+                            AuthorizationUrl = new Uri(configuration["Keycloak:AuthUrl"]!),
+
+                            /*Scopes = new Dictionary<string, string>
+                            {
+                                {"openid", "openid"},
+                                {"profile", "profile"}
+                            }*/
+                        }
                     }
-                }
-            });
+                });
 
-            var securityRequirement = new OpenApiSecurityRequirement
-            {
+                var securityRequirement = new OpenApiSecurityRequirement
                 {
-                    new OpenApiSecurityScheme
                     {
-                        Reference = new OpenApiReference
+                        new OpenApiSecurityScheme
                         {
-                            Id = "Keycloak",
-                            Type = ReferenceType.SecurityScheme
+                            Reference = new OpenApiReference
+                            {
+                                Id = "Keycloak",
+                                Type = ReferenceType.SecurityScheme
+                            },
+                            In = ParameterLocation.Header,
+                            Name = "Bearer",
+                            Scheme = "Bearer"
                         },
-                        In = ParameterLocation.Header,
-                        Name = "Bearer",
-                        Scheme = "Bearer"
-                    },
-                    []
-                }
-            };
-            options.AddSecurityRequirement(securityRequirement);
-
-            options.DocumentFilter<HealthCheckDocumentFilter>();
-
-            options.ExampleFilters();
-            options.DocumentFilter<EventDocumentFilter>();
-        });
-        return services;
-    }
-    public static IServiceCollection AddAuth(this IServiceCollection services, IConfiguration configuration)
-    {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(o =>
-            {
-                o.RequireHttpsMetadata = false;
-                o.Audience = configuration["Authentication:Audience"];
-                o.MetadataAddress = configuration["Authentication:MetadataAddress"]!;
-                o.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidIssuer = configuration["Authentication:ValidIssuer"]
+                        []
+                    }
                 };
+                options.AddSecurityRequirement(securityRequirement);
+
+                options.DocumentFilter<HealthCheckDocumentFilter>();
+
+                options.ExampleFilters();
+                options.DocumentFilter<EventDocumentFilter>();
             });
-        return services;
+            return services;
+        }
+        public static IServiceCollection AddAuth(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(o =>
+                {
+                    o.RequireHttpsMetadata = false;
+                    o.Audience = configuration["Authentication:Audience"];
+                    o.MetadataAddress = configuration["Authentication:MetadataAddress"]!;
+                    o.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidIssuer = configuration["Authentication:ValidIssuer"],
+                    };
+                });
+            return services;
+        }
     }
 }

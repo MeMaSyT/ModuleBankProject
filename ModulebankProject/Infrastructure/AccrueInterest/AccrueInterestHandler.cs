@@ -3,51 +3,52 @@ using ModulebankProject.Features.Outbox;
 using ModulebankProject.Infrastructure.Data;
 using Npgsql;
 
-namespace ModulebankProject.Infrastructure.AccrueInterest;
-
-public class AccrueInterestHandler
+namespace ModulebankProject.Infrastructure.AccrueInterest
 {
-    private readonly ModulebankDataContext _dataContext;
-
-    // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
-    public AccrueInterestHandler(ModulebankDataContext dataContext)
+    public class AccrueInterestHandler
     {
-        _dataContext = dataContext;
-    }
+        private readonly ModulebankDataContext _dataContext;
 
-    public async Task Handle(Guid accountId)
-    {
-        await using var transaction = await _dataContext.Database.BeginTransactionAsync();
-        try
+        // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
+        public AccrueInterestHandler(ModulebankDataContext dataContext)
         {
-            await _dataContext.Database.ExecuteSqlRawAsync(
-                "CALL accrue_interest({0})",
-                accountId);
+            _dataContext = dataContext;
+        }
 
-            await transaction.CommitAsync();
-
-            var accrueEvent = new OutboxMessage
+        public async Task Handle(Guid accountId)
+        {
+            await using var transaction = await _dataContext.Database.BeginTransactionAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                Content = "InterestRete",
-                Error = "",
-                Type = "money.*",
-                Properties = new Dictionary<string, object>
+                await _dataContext.Database.ExecuteSqlRawAsync(
+                    "CALL accrue_interest({0})",
+                    accountId);
+
+                await transaction.CommitAsync();
+
+                var accrueEvent = new OutboxMessage
                 {
-                    ["Type"] = "Accrue"
-                }
-            };
-            await _dataContext.OutboxMessages.AddAsync(accrueEvent);
-            await _dataContext.SaveChangesAsync();
-        }
-        catch (PostgresException ex) when (ex.SqlState == "P0001")
-        {
-            await transaction.RollbackAsync();
-            Console.WriteLine(ex.MessageText);
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
+                    Id = Guid.NewGuid(),
+                    Content = "InterestRete",
+                    Error = "",
+                    Type = "money.*",
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["Type"] = "Accrue"
+                    }
+                };
+                await _dataContext.OutboxMessages.AddAsync(accrueEvent);
+                await _dataContext.SaveChangesAsync();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                await transaction.RollbackAsync();
+                Console.WriteLine(ex.MessageText);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+            }
         }
     }
 }

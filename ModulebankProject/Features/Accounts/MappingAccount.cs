@@ -1,12 +1,13 @@
 ﻿using AutoMapper;
 
-namespace ModulebankProject.Features.Accounts;
-
-public class MappingAccount : Profile
+namespace ModulebankProject.Features.Accounts
 {
-    public MappingAccount()
+    public class MappingAccount : Profile
     {
-        CreateMap<Account, AccountDto>();
-        CreateMap<Account, AccountStatementDto>();
+        public MappingAccount()
+        {
+            CreateMap<Account, AccountDto>();
+            CreateMap<Account, AccountStatementDto>();
+        }
     }
 }

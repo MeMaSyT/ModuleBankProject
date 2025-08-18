@@ -1,11 +1,12 @@
 ﻿using AutoMapper;
 
-namespace ModulebankProject.Features.Transactions;
-
-public class MappingTransaction : Profile
+namespace ModulebankProject.Features.Transactions
 {
-    public MappingTransaction()
+    public class MappingTransaction : Profile
     {
-        CreateMap<Transaction, TransactionDto>();
+        public MappingTransaction()
+        {
+            CreateMap<Transaction, TransactionDto>();
+        }
     }
 }

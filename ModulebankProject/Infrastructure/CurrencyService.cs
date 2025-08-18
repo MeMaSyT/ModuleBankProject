@@ -1,20 +1,21 @@
-﻿namespace ModulebankProject.Infrastructure;
-
-public class CurrencyService
+﻿namespace ModulebankProject.Infrastructure
 {
-    public static readonly string[] Currencies =
-    [
-        "RUB", "USD"
-    ];
-
-    public static string GetCurrency(string? value)
+    public class CurrencyService
     {
-        if (value == null) return "";
-        foreach (var currency in Currencies)
-        {
-            if(value.ToUpper() == currency) return currency;
-        }
+        public static readonly string[] Currencies =
+        [
+            "RUB", "USD"
+        ];
 
-        return "";
+        public static string GetCurrency(string? value)
+        {
+            if (value == null) return "";
+            foreach (var currency in Currencies)
+            {
+                if(value.ToUpper() == currency) return currency;
+            }
+
+            return "";
+        }
     }
 }
