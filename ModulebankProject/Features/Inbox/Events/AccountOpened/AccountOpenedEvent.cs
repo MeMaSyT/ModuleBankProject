@@ -20,7 +20,7 @@ public class AccountOpenedEvent : EventBase
     /// Валюта счета (ISO код)
     /// </summary>
     /// <example>USD</example>
-    public string Currency { get; set; }
+    public string Currency { get; set; } = "";
 
     /// <summary>
     /// Тип счета

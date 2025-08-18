@@ -1,53 +1,56 @@
 ﻿using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace ModulebankProject.HealthCheck
+namespace ModulebankProject.HealthCheck;
+
+public class HealthCheckDocumentFilter : IDocumentFilter
 {
-    public class HealthCheckDocumentFilter : IDocumentFilter
+    public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
-        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+        var paths = new OpenApiPaths
         {
-            var paths = new OpenApiPaths();
-
-            paths.Add("/health/live", new OpenApiPathItem
             {
-                Operations = new Dictionary<OperationType, OpenApiOperation>
+                "/health/live", new OpenApiPathItem
                 {
-                    [OperationType.Get] = new OpenApiOperation
+                    Operations = new Dictionary<OperationType, OpenApiOperation>
                     {
-                        Tags = new List<OpenApiTag> { new() { Name = "HealthChecks" } },
-                        Summary = "Liveness check",
-                        Description = "Checks if the service is alive",
-                        Responses = new OpenApiResponses
+                        [OperationType.Get] = new()
                         {
-                            ["200"] = new OpenApiResponse { Description = "Service is alive" }
+                            Tags = new List<OpenApiTag> { new() { Name = "HealthChecks" } },
+                            Summary = "Liveliness check",
+                            Description = "Checks if the service is alive",
+                            Responses = new OpenApiResponses
+                            {
+                                ["200"] = new() { Description = "Service is alive" }
+                            }
                         }
                     }
                 }
-            });
-
-            paths.Add("/health/ready", new OpenApiPathItem
+            },
             {
-                Operations = new Dictionary<OperationType, OpenApiOperation>
+                "/health/ready", new OpenApiPathItem
                 {
-                    [OperationType.Get] = new OpenApiOperation
+                    Operations = new Dictionary<OperationType, OpenApiOperation>
                     {
-                        Tags = new List<OpenApiTag> { new() { Name = "HealthChecks" } },
-                        Summary = "Readiness check",
-                        Description = "Checks if the service is ready to accept requests",
-                        Responses = new OpenApiResponses
+                        [OperationType.Get] = new()
                         {
-                            ["200"] = new OpenApiResponse { Description = "Service is ready" },
-                            ["503"] = new OpenApiResponse { Description = "Service is not ready" }
+                            Tags = new List<OpenApiTag> { new() { Name = "HealthChecks" } },
+                            Summary = "Readiness check",
+                            Description = "Checks if the service is ready to accept requests",
+                            Responses = new OpenApiResponses
+                            {
+                                ["200"] = new() { Description = "Service is ready" },
+                                ["503"] = new() { Description = "Service is not ready" }
+                            }
                         }
                     }
                 }
-            });
-
-            foreach (var path in paths)
-            {
-                swaggerDoc.Paths.Add(path.Key, path.Value);
             }
+        };
+
+        foreach (var path in paths)
+        {
+            swaggerDoc.Paths.Add(path.Key, path.Value);
         }
     }
 }

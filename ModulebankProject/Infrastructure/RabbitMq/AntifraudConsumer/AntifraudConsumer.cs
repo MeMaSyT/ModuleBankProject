@@ -9,139 +9,145 @@ using System.Text.Json;
 using ModulebankProject.Features.Inbox.Events;
 using ModulebankProject.Features.InboxDeadLetter;
 
-namespace ModulebankProject.Infrastructure.RabbitMq.AntifraudConsumer
+namespace ModulebankProject.Infrastructure.RabbitMq.AntifraudConsumer;
+
+public class AntifraudConsumer : BackgroundService
 {
-    public class AntifraudConsumer : BackgroundService
+    private readonly IChannel _channel;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<RabbitMqEventPublisher> _logger;
+    private const string QueueName = "account.antifraud";
+
+    private readonly IAntifraudEventHandler _handler;
+
+    // ReSharper disable once ConvertToPrimaryConstructor
+    public AntifraudConsumer(
+        IChannel channel,
+        IServiceProvider serviceProvider, ILogger<RabbitMqEventPublisher> logger, IAntifraudEventHandler handler)
     {
-        private readonly IChannel _channel;
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<RabbitMqEventPublisher> _logger;
-        private const string QueueName = "account.antifraud";
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+        _handler = handler;
 
-        private readonly IAntifraudEventHandler _handler;
+        _channel = channel;
+        /*
+        _channel.QueueDeclareAsync(queue: _queueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null);
+        */
+    }
 
-        public AntifraudConsumer(
-            IChannel channel,
-            IServiceProvider serviceProvider,
-            IConfiguration configuration, ILogger<RabbitMqEventPublisher> logger, IAntifraudEventHandler handler)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var consumer = new AsyncEventingBasicConsumer(_channel);
+        Console.WriteLine("Consumer is listening");
+
+        consumer.ReceivedAsync += async (_, ea) =>
         {
-            _serviceProvider = serviceProvider;
-            _logger = logger;
-            _handler = handler;
-
-            _channel = channel;
-            /*
-            _channel.QueueDeclareAsync(queue: _queueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null);
-            */
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            Console.WriteLine("Consumer is listening");
-
-            consumer.ReceivedAsync += async (model, ea) =>
+            var eventType = ea.BasicProperties.Type;
+            var stopwatch = Stopwatch.StartNew();
+            var correlationId = ea.BasicProperties.CorrelationId;
+            try
             {
-                var eventType = ea.BasicProperties.Type;
-                var stopwatch = Stopwatch.StartNew();
-                var correlationId = ea.BasicProperties.CorrelationId;
-                try
+                using var scope = _serviceProvider.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ModulebankDataContext>();
+
+                var body = ea.Body.ToArray();
+                var messageJson = Encoding.UTF8.GetString(body);
+                var message = JsonSerializer.Deserialize<ClientChangeBlockEvent>(messageJson);
+
+                var inboxMessage = new InboxMessage
                 {
-                    using var scope = _serviceProvider.CreateScope();
-                    var dbContext = scope.ServiceProvider.GetRequiredService<ModulebankDataContext>();
+                    Id = message!.EventId,
+                    Handler = "AntifraudEventHandler",
+                    Payload = message.ClientId.ToString()
+                };
 
-                    var body = ea.Body.ToArray();
-                    var messageJson = Encoding.UTF8.GetString(body);
-                    var message = JsonSerializer.Deserialize<ClientChangeBlockEvent>(messageJson);
+                //START VALIDATION
+                // ReSharper disable once ConditionIsAlwaysTrueOrFalse так лучше для читабельности
+                if (message is not { Version: "v1" })
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+                    await QuarantineMessageAsync(dbContext, "Message is null", inboxMessage);
+                    _logger.LogError("Message is null");
+                    return;
+                }
+                Console.WriteLine(message.ClientId + "/--------------------------------------------");
+                if (await dbContext.InboxMessages.AnyAsync(m => m.Id == inboxMessage.Id, stoppingToken))
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+                    await QuarantineMessageAsync(dbContext, "Message already has on DB", inboxMessage);
+                    _logger.LogError("Message already has on DB");
+                    return;
+                }
+                inboxMessage.ProcessedAt = DateTime.UtcNow;
+                dbContext.InboxMessages.Add(inboxMessage);
+                await dbContext.SaveChangesAsync(stoppingToken);
 
-                    var inboxMessage = new InboxMessage
-                    {
-                        Id = message!.EventId,
-                        Handler = "AntifraudEventHandler",
-                        Payload = message.ClientId.ToString()
-                    };
-
-                    //START VALIDATION
-                    if (message == null || message.Version != "v1")
-                    {
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
-                        await QuarantineMessageAsync(dbContext, "Message is null", inboxMessage!);
-                        _logger.LogError("Message is null");
-                        return;
-                    }
-                    Console.WriteLine(message.ClientId + "/--------------------------------------------");
-                    if (await dbContext.InboxMessages.AnyAsync(m => m.Id == inboxMessage.Id, stoppingToken))
-                    {
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
-                        await QuarantineMessageAsync(dbContext, "Message already has on DB", inboxMessage);
-                        _logger.LogError("Message already has on DB");
-                        return;
-                    }
-                    inboxMessage.ProcessedAt = DateTime.UtcNow;
-                    dbContext.InboxMessages.Add(inboxMessage);
-                    await dbContext.SaveChangesAsync(stoppingToken);
-
-                    bool isFreeze = false;
-                    if (eventType == "ClientBlockEvent") isFreeze = true;
-                    else if(eventType == "ClientUnblockedEvent") isFreeze = false;
-                    else
-                    {
+                var isFreeze = false;
+                switch (eventType)
+                {
+                    case "ClientBlockEvent":
+                        isFreeze = true;
+                        break;
+                    case "ClientUnblockedEvent":
+                        isFreeze = false;
+                        break;
+                    default:
                         await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
                         await QuarantineMessageAsync(dbContext, $"EventType {eventType} not found", inboxMessage);
                         _logger.LogError($"EventType {eventType} not found");
-                    }
-                    await _handler.HandleAsync(message.ClientId, isFreeze, stoppingToken);
-
-                    await _channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
-
-                    _logger.LogInformation("Message processed {@ProcessingInfo}", new
-                    {
-                        EventId = message.EventId,
-                        CorrelationId = correlationId,
-                        LatencyMs = stopwatch.ElapsedMilliseconds,
-                        Status = "Success"
-                    });
+                        break;
                 }
-                catch (Exception ex)
+                await _handler.HandleAsync(message.ClientId, isFreeze, stoppingToken);
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
+
+                _logger.LogInformation("Message processed {@ProcessingInfo}", new
                 {
-                    _logger.LogError(ex, "Message processing failed {@ProcessingInfo}", new
-                    {
-                        CorrelationId = correlationId,
-                        LatencyMs = stopwatch.ElapsedMilliseconds,
-                        Status = "Failed",
-                        RetryCount = 0
-                    });
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, true, stoppingToken); // Повторяем попытку
-                }
-            };
-
-            await _channel.BasicConsumeAsync(queue: QueueName,
-                                 autoAck: false,
-                                 consumer: consumer, cancellationToken: stoppingToken);
-
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                await Task.Delay(1000, stoppingToken);
+                    message.EventId,
+                    CorrelationId = correlationId,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    Status = "Success"
+                });
             }
-        }
-        private async Task QuarantineMessageAsync(
-            ModulebankDataContext dbContext,
-            string error, InboxMessage message)
-        {
-            var deadLetter = new InboxDeadLetter
+            catch (Exception ex)
             {
-                Id = Guid.NewGuid(),
-                Handler = message.Handler,
-                Payload = message.Payload!,
-                Error = error
-            };
+                _logger.LogError(ex, "Message processing failed {@ProcessingInfo}", new
+                {
+                    CorrelationId = correlationId,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    Status = "Failed",
+                    RetryCount = 0
+                });
+                await _channel.BasicNackAsync(ea.DeliveryTag, false, true, stoppingToken); // Повторяем попытку
+            }
+        };
 
-            await dbContext.InboxDeadLetters.AddAsync(deadLetter);
-            await dbContext.SaveChangesAsync();
+        await _channel.BasicConsumeAsync(queue: QueueName,
+            autoAck: false,
+            consumer: consumer, cancellationToken: stoppingToken);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(1000, stoppingToken);
         }
+    }
+    private static async Task QuarantineMessageAsync(
+        ModulebankDataContext dbContext,
+        string error, InboxMessage message)
+    {
+        var deadLetter = new InboxDeadLetter
+        {
+            Id = Guid.NewGuid(),
+            Handler = message.Handler,
+            Payload = message.Payload!,
+            Error = error
+        };
+
+        await dbContext.InboxDeadLetters.AddAsync(deadLetter);
+        await dbContext.SaveChangesAsync();
     }
 }

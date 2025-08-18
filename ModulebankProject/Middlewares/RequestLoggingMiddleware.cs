@@ -1,61 +1,62 @@
 ﻿using System.Diagnostics;
 
-namespace ModulebankProject.Middlewares
+namespace ModulebankProject.Middlewares;
+
+public class RequestLoggingMiddleware
 {
-    public class RequestLoggingMiddleware
+    private readonly RequestDelegate _next;
+    private readonly ILogger _logger;
+
+    // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
+    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger _logger;
+        _next = next;
+        _logger = logger;
+    }
 
-        public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
+    // ReSharper disable once UnusedMember.Global
+    public async Task Invoke(HttpContext context)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString();
+        context.Items["CorrelationId"] = correlationId;
+
+        // Input
+        _logger.LogInformation("HTTP request started {@RequestInfo}", new
         {
-            _next = next;
-            _logger = logger;
-        }
+            RequestId = Guid.NewGuid(),
+            CorrelationId = correlationId,
+            context.Request.Method,
+            context.Request.Path,
+            QueryString = context.Request.QueryString.Value,
+            Headers = context.Request.Headers
+                .Where(h => !h.Key.StartsWith("Authorization"))
+                .ToDictionary(h => h.Key, h => h.Value.ToString())
+        });
 
-        public async Task Invoke(HttpContext context)
+        try
         {
-            var stopwatch = Stopwatch.StartNew();
-            var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString();
-            context.Items["CorrelationId"] = correlationId;
+            await _next(context);
 
-            // Input
-            _logger.LogInformation("HTTP request started {@RequestInfo}", new
+            // Output
+            _logger.LogInformation("HTTP request completed {@ResponseInfo}", new
             {
                 RequestId = Guid.NewGuid(),
                 CorrelationId = correlationId,
-                Method = context.Request.Method,
-                Path = context.Request.Path,
-                QueryString = context.Request.QueryString.Value,
-                Headers = context.Request.Headers
-                    .Where(h => !h.Key.StartsWith("Authorization"))
-                    .ToDictionary(h => h.Key, h => h.Value.ToString())
+                context.Response.StatusCode,
+                LatencyMs = stopwatch.ElapsedMilliseconds,
+                context.Response.ContentType
             });
-
-            try
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "HTTP request failed {@ErrorInfo}", new
             {
-                await _next(context);
-
-                // Output
-                _logger.LogInformation("HTTP request completed {@ResponseInfo}", new
-                {
-                    RequestId = Guid.NewGuid(),
-                    CorrelationId = correlationId,
-                    StatusCode = context.Response.StatusCode,
-                    LatencyMs = stopwatch.ElapsedMilliseconds,
-                    ContentType = context.Response.ContentType
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "HTTP request failed {@ErrorInfo}", new
-                {
-                    RequestId = Guid.NewGuid(),
-                    CorrelationId = correlationId,
-                    LatencyMs = stopwatch.ElapsedMilliseconds
-                });
-                throw;
-            }
+                RequestId = Guid.NewGuid(),
+                CorrelationId = correlationId,
+                LatencyMs = stopwatch.ElapsedMilliseconds
+            });
+            throw;
         }
     }
 }

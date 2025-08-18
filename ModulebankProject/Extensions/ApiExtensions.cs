@@ -5,83 +5,82 @@ using ModulebankProject.Features.Inbox.Events;
 using ModulebankProject.HealthCheck;
 using Swashbuckle.AspNetCore.Filters;
 
-namespace ModulebankProject.Extensions
+namespace ModulebankProject.Extensions;
+
+public static class ApiExtensions
 {
-    public static class ApiExtensions
+    public static IServiceCollection AddCustomSwagger(this IServiceCollection services,
+        IConfiguration configuration)
     {
-        public static IServiceCollection AddCustomSwagger(this IServiceCollection services,
-            IConfiguration configuration)
+        services.AddOpenApi();
+        services.AddSwaggerExamplesFromAssemblyOf<Program>();
+        services.AddSwaggerGen(options =>
         {
-            services.AddOpenApi();
-            services.AddSwaggerExamplesFromAssemblyOf<Program>();
-            services.AddSwaggerGen(options =>
+            var basePath = AppContext.BaseDirectory;
+
+            var xmlPath = Path.Combine(basePath, "ModulebankProject.xml");
+            options.UseInlineDefinitionsForEnums();
+            options.IncludeXmlComments(xmlPath);
+
+            options.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
+
+            options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
             {
-                var basePath = AppContext.BaseDirectory;
-
-                var xmlPath = Path.Combine(basePath, "ModulebankProject.xml");
-                options.UseInlineDefinitionsForEnums();
-                options.IncludeXmlComments(xmlPath);
-
-                options.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
-
-                options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
+                Type = SecuritySchemeType.OAuth2,
+                Flows = new OpenApiOAuthFlows
                 {
-                    Type = SecuritySchemeType.OAuth2,
-                    Flows = new OpenApiOAuthFlows
+                    Implicit = new OpenApiOAuthFlow
                     {
-                        Implicit = new OpenApiOAuthFlow
+                        AuthorizationUrl = new Uri(configuration["Keycloak:AuthUrl"]!)
+
+                        /*Scopes = new Dictionary<string, string>
                         {
-                            AuthorizationUrl = new Uri(configuration["Keycloak:AuthUrl"]!),
-
-                            /*Scopes = new Dictionary<string, string>
-                            {
-                                {"openid", "openid"},
-                                {"profile", "profile"}
-                            }*/
-                        }
+                            {"openid", "openid"},
+                            {"profile", "profile"}
+                        }*/
                     }
-                });
-
-                var securityRequirement = new OpenApiSecurityRequirement
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Id = "Keycloak",
-                                Type = ReferenceType.SecurityScheme
-                            },
-                            In = ParameterLocation.Header,
-                            Name = "Bearer",
-                            Scheme = "Bearer"
-                        },
-                        []
-                    }
-                };
-                options.AddSecurityRequirement(securityRequirement);
-
-                options.DocumentFilter<HealthCheckDocumentFilter>();
-
-                options.ExampleFilters();
-                options.DocumentFilter<EventDocumentFilter>();
+                }
             });
-            return services;
-        }
-        public static IServiceCollection AddAuth(this IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(o =>
+
+            var securityRequirement = new OpenApiSecurityRequirement
+            {
                 {
-                    o.RequireHttpsMetadata = false;
-                    o.Audience = configuration["Authentication:Audience"];
-                    o.MetadataAddress = configuration["Authentication:MetadataAddress"]!;
-                    o.TokenValidationParameters = new TokenValidationParameters
+                    new OpenApiSecurityScheme
                     {
-                        ValidIssuer = configuration["Authentication:ValidIssuer"],
-                    };
-                });
-            return services;
-        }
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Keycloak",
+                            Type = ReferenceType.SecurityScheme
+                        },
+                        In = ParameterLocation.Header,
+                        Name = "Bearer",
+                        Scheme = "Bearer"
+                    },
+                    []
+                }
+            };
+            options.AddSecurityRequirement(securityRequirement);
+
+            options.DocumentFilter<HealthCheckDocumentFilter>();
+
+            options.ExampleFilters();
+            options.DocumentFilter<EventDocumentFilter>();
+        });
+        return services;
+    }
+    public static IServiceCollection AddAuth(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(o =>
+            {
+                o.RequireHttpsMetadata = false;
+                o.Audience = configuration["Authentication:Audience"];
+                o.MetadataAddress = configuration["Authentication:MetadataAddress"]!;
+                o.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidIssuer = configuration["Authentication:ValidIssuer"]
+                };
+            });
+        return services;
     }
 }

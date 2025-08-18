@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Ждем готовности Postgres
+until pg_isready -h postgres -U myuser; do
+  sleep 2
+done
+
+# Восстанавливаем дамп только если БД пустая
+if [ -z "$(psql -h postgres -U myuser -d mydb -tAc 'SELECT 1 FROM pg_database WHERE datname='\''mydb'\''')" ]; then
+  psql -h postgres -U myuser -d mydb -f /docker-entrypoint-initdb.d/dump.sql
+fi
