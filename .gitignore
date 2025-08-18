@@ -205,3 +205,4 @@ $RECYCLE.BIN/
 *.msp
 
 .vs/
+/.containers/rabbitmq_data/.erlang.cookie
