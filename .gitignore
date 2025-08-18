@@ -206,3 +206,4 @@ $RECYCLE.BIN/
 
 .vs/
 /.containers/rabbitmq_data/.erlang.cookie
+/.containers/postgres-data.zip

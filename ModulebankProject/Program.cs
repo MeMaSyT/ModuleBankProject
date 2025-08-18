@@ -25,7 +25,6 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
 using Swashbuckle.AspNetCore.Annotations;
-using System;
 
 namespace ModulebankProject;
 
