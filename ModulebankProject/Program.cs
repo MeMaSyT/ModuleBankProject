@@ -25,6 +25,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
 using Swashbuckle.AspNetCore.Annotations;
+using System;
 
 namespace ModulebankProject;
 
@@ -80,6 +81,13 @@ public class Program
 
             builder.Services.AddDbContext<ModulebankDataContext>(options =>
                 options.UseNpgsql(dataSource));
+            var services = builder.Services.BuildServiceProvider();
+
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ModulebankDataContext>();
+                db.Database.Migrate();
+            }
             builder.Services.AddScoped<IAccountsRepository, AccountsRepository>();
             builder.Services.AddScoped<ITransactionsRepository, TransactionsRepository>();
 
