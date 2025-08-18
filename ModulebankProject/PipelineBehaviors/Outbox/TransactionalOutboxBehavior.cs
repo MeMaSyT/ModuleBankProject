@@ -1,61 +1,57 @@
 ﻿using MediatR;
 using ModulebankProject.Infrastructure.Data;
-using ModulebankProject.Infrastructure.RabbitMq;
 
-namespace ModulebankProject.PipelineBehaviors.Outbox
+namespace ModulebankProject.PipelineBehaviors.Outbox;
+
+public class TransactionalOutboxBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
 {
-    public class TransactionalOutboxBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
+    private readonly ModulebankDataContext _dbContext;
+
+    // ReSharper disable once ConvertToPrimaryConstructor не хочу первичный конструктор
+    public TransactionalOutboxBehavior(
+        ModulebankDataContext dbContext)
     {
-        private readonly ModulebankDataContext _dbContext;
-        private readonly IEventPublisher _eventPublisher;
+        _dbContext = dbContext;
+    }
 
-        public TransactionalOutboxBehavior(
-            ModulebankDataContext dbContext,
-            IEventPublisher eventPublisher)
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken cancellationToken)
+    {
+        if (request is not ICommandWithEvents commandWithEvents)
         {
-            _dbContext = dbContext;
-            _eventPublisher = eventPublisher;
+            return await next(cancellationToken);
         }
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        public async Task<TResponse> Handle(
-            TRequest request,
-            RequestHandlerDelegate<TResponse> next,
-            CancellationToken cancellationToken)
+        try
         {
-            if (request is not ICommandWithEvents commandWithEvents)
-            {
-                return await next();
-            }
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var response = await next(cancellationToken);
 
-            try
+            if (commandWithEvents.Events.Count > 0)
             {
-                var response = await next();
-
-                if (commandWithEvents.Events.Count > 0)
+                foreach (var outboxMessage in commandWithEvents.Events)
                 {
-                    foreach (var outboxMessage in commandWithEvents.Events)
-                    {
-                        outboxMessage.OccurredOn = DateTime.UtcNow;
-                        await _dbContext.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
-                    }
-
-                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    outboxMessage.OccurredOn = DateTime.UtcNow;
+                    await _dbContext.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
                 }
 
-                await transaction.CommitAsync(cancellationToken);
-
-                //await _eventPublisher.PublishPendingEventsAsync(cancellationToken);
-
-                return response;
+                await _dbContext.SaveChangesAsync(cancellationToken);
             }
-            catch(Exception e)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                Console.WriteLine("ERROR: " + e);
-                throw;
-            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            //await _eventPublisher.PublishPendingEventsAsync(cancellationToken);
+
+            return response;
+        }
+        catch(Exception e)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            Console.WriteLine("ERROR: " + e);
+            throw;
         }
     }
 }

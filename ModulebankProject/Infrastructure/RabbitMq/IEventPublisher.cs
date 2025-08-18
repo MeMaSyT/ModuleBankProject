@@ -1,7 +1,6 @@
-﻿namespace ModulebankProject.Infrastructure.RabbitMq
+﻿namespace ModulebankProject.Infrastructure.RabbitMq;
+
+public interface IEventPublisher
 {
-    public interface IEventPublisher
-    {
-        Task<bool> PublishPendingEventsAsync(CancellationToken cancellationToken);
-    }
+    Task<bool> PublishPendingEventsAsync(CancellationToken cancellationToken);
 }
